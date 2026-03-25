@@ -1,0 +1,52 @@
+[package]
+name = "gitmemo"
+version = "0.1.0"
+edition = "2021"
+description = "Auto-sync your AI conversations and notes to Git"
+license = "MIT"
+
+[[bin]]
+name = "gitmemo"
+path = "src/main.rs"
+
+[dependencies]
+# CLI
+clap = { version = "4", features = ["derive"] }
+dialoguer = "0.11"
+console = "0.15"
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+toml = "0.8"
+
+# Git
+git2 = "0.19"
+
+# Database
+rusqlite = { version = "0.31", features = ["bundled"] }
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# File ops
+dirs = "5"
+walkdir = "2"
+tempfile = "3"
+
+# Hash
+sha2 = "0.10"
+
+# Regex (lightweight)
+regex-lite = "0.1"
+
+# Error handling
+anyhow = "1"
+thiserror = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+[dev-dependencies]
+tempfile = "3"

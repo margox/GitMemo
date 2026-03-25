@@ -1,0 +1,259 @@
+use anyhow::Result;
+use rusqlite::{params, Connection};
+use sha2::{Digest, Sha256};
+use std::path::Path;
+
+pub struct SearchResult {
+    pub source_type: String, // "conversation" or "note"
+    pub title: String,
+    pub file_path: String,
+    pub snippet: String,
+    pub date: String,
+}
+
+pub struct Stats {
+    pub conversation_count: u32,
+    pub note_daily_count: u32,
+    pub note_manual_count: u32,
+    pub note_scratch_count: u32,
+}
+
+pub fn open_or_create(db_path: &Path) -> Result<Connection> {
+    if let Some(parent) = db_path.parent() {
+        std::fs::create_dir_all(parent)?;
+    }
+    let conn = Connection::open(db_path)?;
+    init_schema(&conn)?;
+    Ok(conn)
+}
+
+fn init_schema(conn: &Connection) -> Result<()> {
+    conn.execute_batch(
+        "
+        CREATE TABLE IF NOT EXISTS documents (
+            id          TEXT PRIMARY KEY,
+            file_path   TEXT NOT NULL UNIQUE,
+            source_type TEXT NOT NULL,
+            title       TEXT NOT NULL,
+            created_at  TEXT NOT NULL,
+            content_hash TEXT NOT NULL
+        );
+        CREATE INDEX IF NOT EXISTS idx_docs_type ON documents(source_type);
+        CREATE INDEX IF NOT EXISTS idx_docs_created ON documents(created_at);
+
+        CREATE VIRTUAL TABLE IF NOT EXISTS search_index USING fts5(
+            doc_id,
+            title,
+            content,
+            tokenize='unicode61'
+        );
+        ",
+    )?;
+    Ok(())
+}
+
+fn content_hash(content: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(content.as_bytes());
+    format!("{:x}", hasher.finalize())
+}
+
+/// Index a single file into the database
+pub fn index_file(conn: &Connection, file_path: &str, source_type: &str, title: &str, content: &str, date: &str) -> Result<()> {
+    let hash = content_hash(content);
+    let id = content_hash(file_path);
+
+    // Check if already indexed with same hash
+    let existing_hash: Option<String> = conn
+        .query_row(
+            "SELECT content_hash FROM documents WHERE id = ?1",
+            params![id],
+            |row| row.get(0),
+        )
+        .ok();
+
+    if existing_hash.as_deref() == Some(&hash) {
+        return Ok(()); // No change
+    }
+
+    // Upsert document
+    conn.execute(
+        "INSERT OR REPLACE INTO documents (id, file_path, source_type, title, created_at, content_hash) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+        params![id, file_path, source_type, title, date, hash],
+    )?;
+
+    // Update FTS index
+    conn.execute("DELETE FROM search_index WHERE doc_id = ?1", params![id])?;
+    conn.execute(
+        "INSERT INTO search_index (doc_id, title, content) VALUES (?1, ?2, ?3)",
+        params![id, title, content],
+    )?;
+
+    Ok(())
+}
+
+/// Build index from all markdown files in the sync dir
+pub fn build_index(conn: &Connection, sync_dir: &Path) -> Result<u32> {
+    let mut count = 0u32;
+
+    for subdir in ["conversations", "notes/daily", "notes/manual", "notes/scratch"] {
+        let dir = sync_dir.join(subdir);
+        if !dir.exists() {
+            continue;
+        }
+
+        let source_type = if subdir == "conversations" {
+            "conversation"
+        } else {
+            "note"
+        };
+
+        for entry in walkdir::WalkDir::new(&dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
+        {
+            let path = entry.path();
+            let content = std::fs::read_to_string(path)?;
+
+            // Extract title from first # heading or filename
+            let title = content
+                .lines()
+                .find(|l| l.starts_with("# "))
+                .map(|l| l.trim_start_matches("# ").to_string())
+                .unwrap_or_else(|| {
+                    path.file_stem()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .to_string()
+                });
+
+            // Extract date from frontmatter or filename
+            let date = content
+                .lines()
+                .find(|l| l.starts_with("date:"))
+                .map(|l| l.trim_start_matches("date:").trim().to_string())
+                .unwrap_or_else(|| {
+                    path.file_stem()
+                        .unwrap_or_default()
+                        .to_string_lossy()
+                        .chars()
+                        .take(10)
+                        .collect()
+                });
+
+            let rel_path = path
+                .strip_prefix(sync_dir)
+                .unwrap_or(path)
+                .to_string_lossy()
+                .to_string();
+
+            index_file(conn, &rel_path, source_type, &title, &content, &date)?;
+            count += 1;
+        }
+    }
+
+    Ok(count)
+}
+
+/// Full-text search
+pub fn search(conn: &Connection, query: &str, type_filter: &str, limit: usize) -> Result<Vec<SearchResult>> {
+    let sql = if type_filter == "all" {
+        "SELECT d.source_type, d.title, d.file_path, snippet(search_index, 2, '**', '**', '...', 20) as snip, d.created_at
+         FROM search_index si
+         JOIN documents d ON d.id = si.doc_id
+         WHERE search_index MATCH ?1
+         ORDER BY rank
+         LIMIT ?2"
+            .to_string()
+    } else {
+        format!(
+            "SELECT d.source_type, d.title, d.file_path, snippet(search_index, 2, '**', '**', '...', 20) as snip, d.created_at
+             FROM search_index si
+             JOIN documents d ON d.id = si.doc_id
+             WHERE search_index MATCH ?1 AND d.source_type = '{}'
+             ORDER BY rank
+             LIMIT ?2",
+            type_filter
+        )
+    };
+
+    let mut stmt = conn.prepare(&sql)?;
+    let results = stmt
+        .query_map(params![query, limit], |row| {
+            Ok(SearchResult {
+                source_type: row.get(0)?,
+                title: row.get(1)?,
+                file_path: row.get(2)?,
+                snippet: row.get(3)?,
+                date: row.get(4)?,
+            })
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(results)
+}
+
+/// List recent documents
+pub fn recent(conn: &Connection, limit: usize, days: u32) -> Result<Vec<SearchResult>> {
+    let cutoff = chrono::Local::now() - chrono::Duration::days(days as i64);
+    let cutoff_str = cutoff.format("%Y-%m-%d").to_string();
+
+    let mut stmt = conn.prepare(
+        "SELECT source_type, title, file_path, '', created_at
+         FROM documents
+         WHERE source_type = 'conversation' AND created_at >= ?1
+         ORDER BY created_at DESC
+         LIMIT ?2",
+    )?;
+
+    let results = stmt
+        .query_map(params![cutoff_str, limit], |row| {
+            Ok(SearchResult {
+                source_type: row.get(0)?,
+                title: row.get(1)?,
+                file_path: row.get(2)?,
+                snippet: row.get(3)?,
+                date: row.get(4)?,
+            })
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(results)
+}
+
+/// Get stats
+pub fn get_stats(conn: &Connection) -> Result<Stats> {
+    let conversation_count: u32 = conn.query_row(
+        "SELECT COUNT(*) FROM documents WHERE source_type = 'conversation'",
+        [],
+        |row| row.get(0),
+    )?;
+
+    let note_daily_count: u32 = conn.query_row(
+        "SELECT COUNT(*) FROM documents WHERE file_path LIKE 'notes/daily/%'",
+        [],
+        |row| row.get(0),
+    )?;
+
+    let note_manual_count: u32 = conn.query_row(
+        "SELECT COUNT(*) FROM documents WHERE file_path LIKE 'notes/manual/%'",
+        [],
+        |row| row.get(0),
+    )?;
+
+    let note_scratch_count: u32 = conn.query_row(
+        "SELECT COUNT(*) FROM documents WHERE file_path LIKE 'notes/scratch/%'",
+        [],
+        |row| row.get(0),
+    )?;
+
+    Ok(Stats {
+        conversation_count,
+        note_daily_count,
+        note_manual_count,
+        note_scratch_count,
+    })
+}
