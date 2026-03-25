@@ -1,6 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub enum NoteType {
     Daily,
     Manual,
@@ -8,6 +9,7 @@ pub enum NoteType {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+#[allow(dead_code)]
 pub struct Note {
     pub id: String,
     pub file_path: String,

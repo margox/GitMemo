@@ -1,4 +1,5 @@
 /// Placeholder for sensitive info filtering
+#[allow(dead_code)]
 pub fn filter_sensitive(content: &str) -> String {
     let mut result = content.to_string();
 

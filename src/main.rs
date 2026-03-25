@@ -9,9 +9,6 @@ use anyhow::Result;
 use clap::Parser;
 use cli::{Cli, Commands};
 
-#[cfg(unix)]
-use std::os::unix;
-
 fn main() -> Result<()> {
     let cli = Cli::parse();
 
@@ -386,6 +383,7 @@ fn cmd_manual(title: &str, content: Option<String>, append: bool) -> Result<()> 
     Ok(())
 }
 
+#[allow(dead_code)]
 fn open_db() -> Result<rusqlite::Connection> {
     let sync_dir = ensure_init()?;
     let db_path = sync_dir.join(".metadata").join("index.db");

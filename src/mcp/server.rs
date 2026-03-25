@@ -77,7 +77,7 @@ fn handle_request(request: &Value) -> Value {
 
         "notifications/initialized" => {
             // No response needed for notifications
-            return json!(null);
+            json!(null)
         }
 
         _ => json_rpc_error(id, -32601, &format!("Method not found: {}", method)),

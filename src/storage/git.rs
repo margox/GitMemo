@@ -7,7 +7,7 @@ pub fn init_repo(repo_path: &Path, remote_url: &str) -> Result<git2::Repository>
         // Open existing repo
         let repo = git2::Repository::open(repo_path)?;
         // Update remote URL if different
-        if let Ok(mut remote) = repo.find_remote("origin") {
+        if let Ok(remote) = repo.find_remote("origin") {
             if remote.url().unwrap_or("") != remote_url {
                 drop(remote);
                 repo.remote_set_url("origin", remote_url)?;
@@ -57,6 +57,7 @@ pub fn commit_and_push(repo_path: &Path, message: &str) -> Result<()> {
 }
 
 /// Test if remote is reachable
+#[allow(dead_code)]
 pub fn test_remote(repo_path: &Path) -> Result<()> {
     let repo = git2::Repository::open(repo_path)?;
     let mut remote = repo.find_remote("origin")?;
