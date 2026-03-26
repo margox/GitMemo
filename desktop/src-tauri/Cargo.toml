@@ -1,0 +1,50 @@
+[package]
+name = "gitmemo-desktop"
+version = "0.1.0"
+description = "GitMemo Desktop - Your AI knowledge, always in Git"
+authors = ["GitMemo Team"]
+edition = "2021"
+
+[lib]
+name = "gitmemo_desktop_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+# Tauri
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-opener = "2"
+tauri-plugin-process = "2"
+tauri-plugin-clipboard-manager = "2"
+
+# Core library (reuse gitmemo logic)
+gitmemo_core = { path = "../..", package = "gitmemo" }
+
+# Serialization
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Async
+tokio = { version = "1", features = ["full"] }
+
+# Error handling
+thiserror = "2"
+anyhow = "1"
+
+# Time
+chrono = { version = "0.4", features = ["serde"] }
+
+# Logging
+log = "0.4"
+
+# File system
+walkdir = "2"
+
+# Hash
+sha2 = "0.10"
+
+# File watching (for clipboard & file change events)
+notify = { version = "7", features = ["macos_kqueue"] }

@@ -1,0 +1,14 @@
+{
+  "identifier": "default",
+  "description": "Default capability for GitMemo desktop",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:default",
+    "opener:default",
+    "process:default",
+    "clipboard-manager:default",
+    "clipboard-manager:allow-read-text",
+    "clipboard-manager:allow-write-text"
+  ]
+}

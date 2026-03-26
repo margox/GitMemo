@@ -6,6 +6,10 @@ description = "Auto-sync your AI conversations and notes to Git"
 license = "MIT"
 repository = "https://github.com/sahadev/GitMemo"
 
+[lib]
+name = "gitmemo_core"
+path = "src/lib.rs"
+
 [[bin]]
 name = "gitmemo"
 path = "src/main.rs"
