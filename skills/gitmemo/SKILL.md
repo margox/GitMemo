@@ -7,16 +7,28 @@ description: "When users want to auto-save AI conversations to Git, sync chat hi
 
 GitMemo automatically records your conversations with AI agents as Markdown files and syncs them to a Git repository. It supports both Claude Code and Cursor.
 
-## Installation
+> **Note:** Installing this skill via `npx skills add` only adds the skill reference. To actually use GitMemo, you need to install the CLI and run initialization — see below.
+
+## Quick Start (Required)
 
 ```bash
-# One-line install
+# Step 1: Install the CLI binary
 bash <(curl -fsSL https://github.com/sahadev/GitMemo/raw/main/scripts/install.sh)
 
-# Initialize (interactive editor selection)
+# Step 2: Initialize — sets up Git repo, editor config, MCP server, and SSH key
 gitmemo init
+```
 
-# Or specify editor directly
+`gitmemo init` will interactively guide you to:
+1. **Choose your editor** (Claude Code / Cursor / both)
+2. **Enter your Git remote URL** (for syncing conversations)
+3. **Generate an SSH key** (add to your repo's Deploy Keys)
+
+After init, **restart your editor session** to activate.
+
+### Specify editor directly (non-interactive)
+
+```bash
 gitmemo init --editor claude    # Claude Code only
 gitmemo init --editor cursor    # Cursor only
 gitmemo init --editor all       # Both
