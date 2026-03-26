@@ -1,0 +1,150 @@
+# GitMemo
+
+[English](README.md) | [中文](README_CN.md)
+
+> 你的 AI 对话与笔记，自动备份到 Git
+
+GitMemo 自动将你与 Claude（或任何 AI Agent）的对话记录为 Markdown 文件，并同步到 Git 仓库。零后台进程，零额外操作。
+
+## 特性
+
+- **自动记录** — 对话自动保存为 Markdown，完全透明
+- **笔记功能** — 便签、每日笔记、手册，一行命令创建
+- **Git 同步** — 自动 commit & push，版本控制、跨设备访问
+- **MCP 集成** — 在 Claude 中直接搜索历史对话、创建笔记
+- **零进程** — 不启动后台服务，利用 Claude Code 原生 hooks 驱动
+- **数据主权** — 数据存储在你自己的 Git 仓库，完全可控
+
+## 工作原理
+
+GitMemo 不是后台服务，而是注入 Claude Code 的原生基础设施：
+
+| 注入点 | 作用 |
+|--------|------|
+| `CLAUDE.md` 指令 | 让 Claude 每次对话后自动保存为 Markdown |
+| `settings.json` Hook | 文件写入后自动 `git commit && git push` |
+| MCP Server | 让 Claude 能搜索历史对话、创建笔记 |
+
+## 前置条件
+
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code)（CLI）
+- Git
+- 一个 Git 远程仓库（GitHub / GitLab / Gitee / 自建）
+
+## 快速开始
+
+### 安装
+
+```bash
+# 一键安装（自动检测平台）
+bash <(curl -fsSL https://github.com/sahadev/GitMemo/raw/main/scripts/install.sh)
+```
+
+<details>
+<summary>手动下载 / 其他安装方式</summary>
+
+从 [Releases](https://github.com/sahadev/GitMemo/releases/latest) 下载对应平台的二进制文件，然后：
+
+```bash
+chmod +x gitmemo-macos-aarch64
+sudo mv gitmemo-macos-aarch64 /usr/local/bin/gitmemo
+```
+
+或从源码编译（需要 Rust 工具链）：
+
+```bash
+git clone https://github.com/sahadev/GitMemo.git
+cd GitMemo
+cargo install --path .
+```
+
+</details>
+
+### 初始化
+
+```bash
+# 全新开始 — 创建 ~/.gitmemo/ 并配置一切
+gitmemo init
+
+# 或链接到已有的本地 Git 仓库
+gitmemo init --path /path/to/your/repo
+```
+
+按提示输入 Git 仓库地址（已有仓库会自动检测），将生成的 SSH 公钥添加到仓库的 Deploy Keys，完成。
+
+### 就这样
+
+你的 Claude 对话将自动保存到 Git 仓库。**重启 Claude 会话**以激活新配置。
+
+### 对话如何保存
+
+**自动保存**：Claude 每次回答后自动保存对话（由 CLAUDE.md 指令驱动）。
+
+**手动保存**：在 Claude 对话中输入 `/save` 或说 "保存会话" 即可立即保存。
+
+### 验证是否生效
+
+```bash
+# 快速测试 — 创建一条笔记
+gitmemo note "hello world"
+
+# 查看状态
+gitmemo status
+```
+
+如果看到笔记文件和 git 提交记录，说明一切正常。
+
+## 命令
+
+```
+gitmemo init               # 初始化配置
+gitmemo status             # 查看状态
+gitmemo note "记个笔记"     # 创建便签
+gitmemo daily              # 今日笔记
+gitmemo manual "标题"       # 创建手册
+gitmemo search "docker"    # 全文搜索对话和笔记
+gitmemo recent             # 最近的对话
+gitmemo stats              # 统计信息
+gitmemo reindex            # 重建搜索索引
+gitmemo uninstall          # 移除配置（保留数据）
+```
+
+## 数据结构
+
+```
+~/.gitmemo/
+├── conversations/          # 自动记录的 AI 对话
+│   └── 2026-03/
+│       └── 03-25-rust-async.md
+├── notes/
+│   ├── daily/              # 每日笔记
+│   ├── manual/             # 手册
+│   └── scratch/            # 便签
+└── .metadata/              # 搜索索引（不同步）
+```
+
+所有数据都是纯 Markdown 文件，可以用任何编辑器打开。卸载后数据依然保留。
+
+## 卸载
+
+```bash
+# 移除配置，保留数据
+gitmemo uninstall
+
+# 移除配置 + 删除所有数据
+gitmemo uninstall --remove-data
+```
+
+## 开发
+
+```bash
+git clone https://github.com/sahadev/GitMemo.git
+cd GitMemo
+cargo build
+cargo test
+cargo run -- help
+```
+
+## 许可证
+
+MIT

@@ -1,5 +1,7 @@
 # GitMemo
 
+[English](README.md) | [中文](README_CN.md)
+
 > Auto-sync your AI conversations and notes to Git
 
 GitMemo automatically records your conversations with Claude (or any AI agent) as Markdown files and syncs them to a Git repository. Zero background process. Zero effort.
