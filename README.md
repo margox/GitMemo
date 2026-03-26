@@ -4,20 +4,30 @@
 
 > Auto-sync your AI conversations and notes to Git
 
-GitMemo automatically records your conversations with Claude (or any AI agent) as Markdown files and syncs them to a Git repository. Zero background process. Zero effort.
+GitMemo automatically records your conversations with Claude or Cursor (or any AI agent) as Markdown files and syncs them to a Git repository. Zero background process. Zero effort.
 
 ## Features
 
 - **Auto-record** — Conversations saved as Markdown, completely transparent
+- **Multi-editor** — Supports both Claude Code and Cursor
 - **Notes** — Scratch notes, daily journal, manuals — one command to create
 - **Git sync** — Auto commit & push, version control, cross-device access
-- **MCP integration** — Search history and create notes directly from Claude
-- **Zero daemon** — No background process, powered by Claude Code native hooks
+- **MCP integration** — Search history and create notes directly from your AI editor
+- **Zero daemon** — No background process, powered by native editor hooks
 - **Data ownership** — Your data stays in YOUR Git repo
+
+## Supported Editors
+
+| Editor | System Instruction | Git Sync | MCP |
+|--------|-------------------|----------|-----|
+| **Claude Code** | `CLAUDE.md` | PostToolUse Hook (automatic) | `~/.claude.json` |
+| **Cursor** | Cursor Rules (`.mdc`) | `cds_sync` MCP tool | `~/.cursor/mcp.json` |
 
 ## How It Works
 
-GitMemo doesn't run as a background service. It injects into Claude Code's native infrastructure:
+GitMemo doesn't run as a background service. It injects into your editor's native infrastructure:
+
+**Claude Code:**
 
 | Injection Point | What It Does |
 |----------------|--------------|
@@ -25,9 +35,17 @@ GitMemo doesn't run as a background service. It injects into Claude Code's nativ
 | `settings.json` Hook | Auto `git commit && git push` after each file write |
 | MCP Server | Enables Claude to search history and create notes |
 
+**Cursor:**
+
+| Injection Point | What It Does |
+|----------------|--------------|
+| `~/.cursor/rules/gitmemo.mdc` | Tells AI to auto-save conversations as Markdown |
+| `cds_sync` MCP tool | AI calls this after saving to trigger git sync |
+| MCP Server | Enables AI to search history and create notes |
+
 ## Requirements
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (CLI)
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code) (CLI) and/or [Cursor](https://cursor.com)
 - Git
 - A Git remote repository (GitHub / GitLab / Gitee / self-hosted)
 
@@ -63,18 +81,23 @@ cargo install --path .
 ### Initialize
 
 ```bash
-# New setup — creates ~/.gitmemo/ and configures everything
+# New setup — interactive editor selection (Claude Code / Cursor / both)
 gitmemo init
 
-# Or link to an existing local Git repo
+# Or specify the editor directly
+gitmemo init --editor claude    # Claude Code only
+gitmemo init --editor cursor    # Cursor only
+gitmemo init --editor all       # Both
+
+# Link to an existing local Git repo
 gitmemo init --path /path/to/your/repo
 ```
 
-Follow the prompts: enter your Git remote URL (auto-detected for existing repos), add the generated SSH public key to your repo's Deploy Keys. Done.
+Follow the prompts: choose your editor, enter your Git remote URL (auto-detected for existing repos), add the generated SSH public key to your repo's Deploy Keys. Done.
 
 ### That's It
 
-Your Claude conversations will now auto-save to the Git repo. **Restart your Claude session** to activate the new configuration.
+Your AI conversations will now auto-save to the Git repo. **Restart your editor session** to activate the new configuration.
 
 ### How Conversations Are Saved
 

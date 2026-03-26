@@ -4,20 +4,30 @@
 
 > 你的 AI 对话与笔记，自动备份到 Git
 
-GitMemo 自动将你与 Claude（或任何 AI Agent）的对话记录为 Markdown 文件，并同步到 Git 仓库。零后台进程，零额外操作。
+GitMemo 自动将你与 Claude 或 Cursor（或任何 AI Agent）的对话记录为 Markdown 文件，并同步到 Git 仓库。零后台进程，零额外操作。
 
 ## 特性
 
 - **自动记录** — 对话自动保存为 Markdown，完全透明
+- **多编辑器** — 同时支持 Claude Code 和 Cursor
 - **笔记功能** — 便签、每日笔记、手册，一行命令创建
 - **Git 同步** — 自动 commit & push，版本控制、跨设备访问
-- **MCP 集成** — 在 Claude 中直接搜索历史对话、创建笔记
-- **零进程** — 不启动后台服务，利用 Claude Code 原生 hooks 驱动
+- **MCP 集成** — 在 AI 编辑器中直接搜索历史对话、创建笔记
+- **零进程** — 不启动后台服务，利用编辑器原生 hooks 驱动
 - **数据主权** — 数据存储在你自己的 Git 仓库，完全可控
+
+## 支持的编辑器
+
+| 编辑器 | 系统指令 | Git 同步 | MCP |
+|--------|---------|----------|-----|
+| **Claude Code** | `CLAUDE.md` | PostToolUse Hook（自动） | `~/.claude.json` |
+| **Cursor** | Cursor Rules（`.mdc`） | `cds_sync` MCP 工具 | `~/.cursor/mcp.json` |
 
 ## 工作原理
 
-GitMemo 不是后台服务，而是注入 Claude Code 的原生基础设施：
+GitMemo 不是后台服务，而是注入编辑器的原生基础设施：
+
+**Claude Code：**
 
 | 注入点 | 作用 |
 |--------|------|
@@ -25,9 +35,17 @@ GitMemo 不是后台服务，而是注入 Claude Code 的原生基础设施：
 | `settings.json` Hook | 文件写入后自动 `git commit && git push` |
 | MCP Server | 让 Claude 能搜索历史对话、创建笔记 |
 
+**Cursor：**
+
+| 注入点 | 作用 |
+|--------|------|
+| `~/.cursor/rules/gitmemo.mdc` | 让 AI 每次对话后自动保存为 Markdown |
+| `cds_sync` MCP 工具 | AI 保存文件后调用此工具触发 git 同步 |
+| MCP Server | 让 AI 能搜索历史对话、创建笔记 |
+
 ## 前置条件
 
-- [Claude Code](https://docs.anthropic.com/en/docs/claude-code)（CLI）
+- [Claude Code](https://docs.anthropic.com/en/docs/claude-code)（CLI）和/或 [Cursor](https://cursor.com)
 - Git
 - 一个 Git 远程仓库（GitHub / GitLab / Gitee / 自建）
 
@@ -63,18 +81,23 @@ cargo install --path .
 ### 初始化
 
 ```bash
-# 全新开始 — 创建 ~/.gitmemo/ 并配置一切
+# 全新开始 — 交互式选择编辑器（Claude Code / Cursor / 两者都装）
 gitmemo init
 
-# 或链接到已有的本地 Git 仓库
+# 或直接指定编辑器
+gitmemo init --editor claude    # 仅 Claude Code
+gitmemo init --editor cursor    # 仅 Cursor
+gitmemo init --editor all       # 两者都装
+
+# 链接到已有的本地 Git 仓库
 gitmemo init --path /path/to/your/repo
 ```
 
-按提示输入 Git 仓库地址（已有仓库会自动检测），将生成的 SSH 公钥添加到仓库的 Deploy Keys，完成。
+按提示选择编辑器、输入 Git 仓库地址（已有仓库会自动检测），将生成的 SSH 公钥添加到仓库的 Deploy Keys，完成。
 
 ### 就这样
 
-你的 Claude 对话将自动保存到 Git 仓库。**重启 Claude 会话**以激活新配置。
+你的 AI 对话将自动保存到 Git 仓库。**重启编辑器会话**以激活新配置。
 
 ### 对话如何保存
 
