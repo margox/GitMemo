@@ -216,10 +216,13 @@ fn cmd_init(git_url: Option<String>, path: Option<String>, no_mcp: bool) -> Resu
     println!("    1. {} 重启 Claude 会话（使配置生效）", style("必须").bold());
     println!("    2. 正常使用 Claude，对话将自动保存");
     println!();
+    println!("  保存会话：");
+    println!("    • 自动：Claude 每次回答后自动保存（无需操作）");
+    println!("    • 手动：在 Claude 中输入 {} 或说 \"保存会话\"", style("/save").cyan());
+    println!();
     println!("  验证是否生效：");
-    println!("    {} 查看已保存的对话", style("gitmemo status").cyan());
-    println!("    {} 查看 Git 提交记录", style("gitmemo recent").cyan());
     println!("    {} 手动测试", style("gitmemo note \"hello world\"").cyan());
+    println!("    {} 查看状态", style("gitmemo status").cyan());
     println!();
 
     Ok(())
