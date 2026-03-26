@@ -34,21 +34,21 @@ GitMemo doesn't run as a background service. It injects into Claude Code's nativ
 ### Install
 
 ```bash
-# macOS (Apple Silicon)
-curl -fsSL https://github.com/sahadev/GitMemo/releases/latest/download/gitmemo-macos-aarch64 -o /usr/local/bin/gitmemo && chmod +x /usr/local/bin/gitmemo
-
-# macOS (Intel)
-curl -fsSL https://github.com/sahadev/GitMemo/releases/latest/download/gitmemo-macos-x86_64 -o /usr/local/bin/gitmemo && chmod +x /usr/local/bin/gitmemo
-
-# Linux (x86_64)
-curl -fsSL https://github.com/sahadev/GitMemo/releases/latest/download/gitmemo-linux-x86_64 -o /usr/local/bin/gitmemo && chmod +x /usr/local/bin/gitmemo
-
-# Linux (aarch64)
-curl -fsSL https://github.com/sahadev/GitMemo/releases/latest/download/gitmemo-linux-aarch64 -o /usr/local/bin/gitmemo && chmod +x /usr/local/bin/gitmemo
-
-# Or build from source
-git clone https://github.com/sahadev/GitMemo.git && cd GitMemo && cargo install --path .
+# One-line install (auto-detects your platform)
+curl -fsSL https://raw.githubusercontent.com/sahadev/GitMemo/main/scripts/install.sh | bash
 ```
+
+<details>
+<summary>Other install methods</summary>
+
+```bash
+# Build from source (requires Rust toolchain)
+git clone https://github.com/sahadev/GitMemo.git
+cd GitMemo
+cargo install --path .
+```
+
+</details>
 
 ### Initialize
 
