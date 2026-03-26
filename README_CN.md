@@ -78,9 +78,7 @@ gitmemo init --path /path/to/your/repo
 
 ### 对话如何保存
 
-**自动保存**：Claude 每次回答后自动保存对话（由 CLAUDE.md 指令驱动）。
-
-**手动保存**：在 Claude 对话中输入 `/save` 或说 "保存会话" 即可立即保存。
+在 Claude 对话中输入 `/save` 即可保存当前会话。Claude 有时也会自动保存（由 CLAUDE.md 指令驱动，不保证每次触发）。
 
 ### 验证是否生效
 

@@ -78,9 +78,7 @@ Your Claude conversations will now auto-save to the Git repo. **Restart your Cla
 
 ### How Conversations Are Saved
 
-**Automatic**: Claude will save conversations after each response (driven by CLAUDE.md instruction).
-
-**Manual**: Type `/save` or say "保存会话" in any Claude conversation to save immediately.
+Type `/save` in any Claude conversation to save the current session. Claude may also auto-save after responses (driven by CLAUDE.md instruction, not guaranteed).
 
 ### Verify It Works
 
