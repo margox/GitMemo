@@ -461,15 +461,33 @@ Claude: [调用 create_manual] 已创建《Kubernetes 使用指南》...
 | 敏感信息过滤 | 自动脱敏 API Key 等 | P2 |
 | 多 Agent 支持 | 支持 Cursor、Copilot 等 | P2 |
 
-### 第 4 层：生态扩展
+### 第 4 层：多来源输入（v0.2 核心）
+
+**从"AI 备份工具"进化为"万物皆可 Git 的知识收集器"**
+
+| 功能 | 描述 | 优先级 |
+|------|------|--------|
+| 剪贴板监听 `watch` / `clip` | 复制即保存，支持文本和图片 | P0 |
+| 截图捕获 `screenshot` | 快捷键截图自动归档 | P0 |
+| 浏览器剪藏 | Chrome 扩展一键保存网页 | P1 |
+| 终端命令记录 `shell-hook` | 自动捕获有价值的命令和输出 | P1 |
+| 文件导入 `import` | 支持 PDF/Word/图片/Notion/Obsidian | P1 |
+| Cursor 对话 | Cursor MCP 集成 | P1 |
+| IM 消息转发 | 飞书/微信/Telegram webhook | P2 |
+| 语音备忘 `voice` | 录音→Whisper 转文字→Markdown | P2 |
+| RSS 订阅 `subscribe` | 自动收集 Newsletter/博客 | P3 |
+
+### 第 5 层：生态扩展（v0.3）
 
 **长期愿景**
 
 | 功能 | 描述 | 优先级 |
 |------|------|--------|
-| Web UI | 浏览器查看对话和笔记 | P3 |
+| Web UI | 浏览器查看所有数据，统一搜索 | P3 |
 | 团队协作 | 共享仓库、权限管理 | P3 |
 | 插件系统 | 自定义捕获源和导出目标 | P3 |
+| AI 自动总结 | 周/月知识回顾 | P3 |
+| 知识图谱 | 可视化内容关联 | P3 |
 
 ---
 
@@ -512,10 +530,11 @@ Claude: [调用 create_manual] 已创建《Kubernetes 使用指南》...
 
 ### 核心差异化总结
 
-1. **自动记录是杀手功能**：没有任何竞品做到了"对话自动备份到 Git"
-2. **Git 原生**：不是"支持 Git"，而是"就是一个 Git 仓库"
-3. **双模式**：自动记录 + 主动笔记，一个工具解决两个问题
-4. **开源免费**：没有商业风险，社区驱动
+1. **多来源输入是护城河**：剪贴板、截图、浏览器、终端、IM、语音——所有知识入口统一到一个 Git 仓库
+2. **自动记录是杀手功能**：没有任何竞品做到了"对话自动备份到 Git"
+3. **Git 原生**：不是"支持 Git"，而是"就是一个 Git 仓库"
+4. **双模式**：自动记录 + 主动笔记，一个工具解决两个问题
+5. **开源免费**：没有商业风险，社区驱动
 
 ---
 
@@ -693,12 +712,214 @@ Claude: [调用 create_manual] 已创建《Kubernetes 使用指南》...
 - [ ] `recent` 命令：最近对话列表
 - [ ] 敏感信息过滤
 
-### Phase 4：多 Agent + 生态（持续）
+### Phase 4：多来源输入 + 生态（v0.2）
 
-- [ ] 支持 Cursor 对话记录
-- [ ] 支持 GitHub Copilot Chat 记录
-- [ ] Web UI
-- [ ] 插件系统
+**核心理念：GitMemo 从"AI 对话备份工具"进化为"万物皆可 Git 的知识收集器"**
+
+所有来源的输入，统一落地到 `~/.gitmemo/`，自动 commit & push。
+
+#### 4.1 输入来源矩阵
+
+| 来源 | 触发方式 | 落地目录 | 优先级 |
+|------|---------|---------|--------|
+| Claude Code 对话 | CLAUDE.md 指令（已有） | `conversations/` | ✅ 已完成 |
+| CLI 笔记 | `gitmemo note/daily/manual`（已有） | `notes/` | ✅ 已完成 |
+| **剪贴板监听** | `gitmemo watch` 常驻 / 快捷键触发 | `clips/` | P0 |
+| **截图捕获** | 快捷键截图 / 粘贴图片 | `clips/{date}/` | P0 |
+| **浏览器剪藏** | Chrome 扩展一键保存 | `webclips/` | P1 |
+| **终端命令记录** | shell hook 自动捕获 | `terminal/` | P1 |
+| **文件导入** | `gitmemo import <file>` / 拖放 | `imports/` | P1 |
+| **Cursor 对话** | Cursor MCP 集成（已部分支持） | `conversations/` | P1 |
+| **IM 消息转发** | 飞书/微信 webhook 接收 | `messages/` | P2 |
+| **语音备忘** | `gitmemo voice` 录音→转文字 | `notes/voice/` | P2 |
+| **RSS/Newsletter** | `gitmemo subscribe <url>` | `feeds/` | P3 |
+
+#### 4.2 剪贴板监听（P0 核心功能）
+
+**用户场景**：
+- 在浏览器看到一段代码/文章，Cmd+C 复制，自动保存到 Git
+- ChatGPT/Gemini 里的对话，复制粘贴就能归档
+- 看到好的推文/微博，复制即收藏
+
+**两种模式**：
+
+```bash
+# 模式1：常驻监听（后台运行，复制即保存）
+gitmemo watch
+# 检测到剪贴板变化 → 自动保存为 clips/{date}/{time}-{前20字}.md
+# 支持文本、图片、富文本
+# 可配置过滤规则（忽略密码管理器、短文本等）
+
+# 模式2：按需捕获（快捷键/命令触发）
+gitmemo clip              # 保存当前剪贴板内容
+gitmemo clip --tag "rust" # 保存并打标签
+gitmemo clip --title "xx" # 保存并指定标题
+```
+
+**智能过滤**：
+- 忽略 < 20 字符的内容（密码、短链接等）
+- 忽略重复内容（SHA256 去重）
+- 忽略密码管理器写入（可配置白名单应用）
+- 图片自动保存为文件，文本保存为 Markdown
+
+**配置**：
+```toml
+[clipboard]
+enabled = true
+min_length = 20              # 最小字符数
+ignore_apps = ["1Password", "Keychain"]  # 忽略的应用
+auto_tag = true              # 自动根据内容打标签
+image_format = "png"         # 图片格式
+```
+
+#### 4.3 截图捕获（P0）
+
+```bash
+# 截图并保存到 Git
+gitmemo screenshot           # 全屏截图
+gitmemo screenshot --select  # 框选截图
+gitmemo screenshot --window  # 窗口截图
+
+# 或者：监听系统截图目录，自动归档
+[screenshot]
+watch_dir = "~/Desktop"      # macOS 默认截图位置
+pattern = "Screenshot*.png"
+auto_import = true
+```
+
+#### 4.4 浏览器剪藏（P1）
+
+Chrome/Firefox 扩展，一键保存网页内容：
+
+- 选中文本 → 右键 → Save to GitMemo
+- 整页保存 → 转为 Markdown
+- 保存时可选标签和目录
+
+扩展通过本地 HTTP API 与 `gitmemo` CLI 通信：
+```
+POST http://localhost:9898/api/clip
+{
+  "title": "Rust Async 最佳实践",
+  "url": "https://...",
+  "content": "...",
+  "tags": ["rust", "async"]
+}
+```
+
+#### 4.5 终端命令记录（P1）
+
+自动记录有价值的终端命令及其输出：
+
+```bash
+# 在 .zshrc/.bashrc 中注入 hook
+eval "$(gitmemo shell-hook)"
+
+# 自动捕获：
+# - 执行时间 > 5 秒的命令
+# - 包含 docker/kubectl/git/ssh/curl 等关键词的命令
+# - 手动标记的命令（命令前加 # 前缀）
+#   例：# kubectl get pods -A
+```
+
+落地为：
+```markdown
+# Terminal Log - 2026-03-27
+
+## 14:32 - kubectl get pods -A
+\`\`\`
+NAMESPACE     NAME                           READY   STATUS
+kube-system   coredns-5d78c9869d-xxxxx       1/1     Running
+...
+\`\`\`
+
+## 15:10 - docker build -t myapp:latest .
+Duration: 45s, Exit: 0
+```
+
+#### 4.6 文件导入（P1）
+
+```bash
+# 导入单个文件
+gitmemo import ./report.pdf          # PDF 提取文本
+gitmemo import ./diagram.png         # 图片直接复制
+gitmemo import ./notes.docx          # Word 转 Markdown
+
+# 批量导入
+gitmemo import ./meeting-notes/      # 导入整个目录
+
+# 从其他工具导入
+gitmemo import --from notion         # Notion 导出导入
+gitmemo import --from obsidian ~/vault  # Obsidian vault 导入
+```
+
+#### 4.7 IM 消息转发（P2）
+
+通过 webhook 接收飞书/微信/Telegram 转发的消息：
+
+```bash
+gitmemo serve --webhook              # 启动 webhook 服务器
+
+# 飞书机器人 → POST http://localhost:9898/webhook/feishu
+# 微信 → 通过中转服务转发
+# Telegram → Bot webhook
+```
+
+#### 4.8 语音备忘（P2）
+
+```bash
+gitmemo voice                        # 开始录音，Ctrl+C 停止
+gitmemo voice --duration 60          # 录 60 秒
+# 录音 → Whisper 本地转文字 → 保存为 Markdown → Git 同步
+```
+
+#### 4.9 更新后的数据目录结构
+
+```
+~/.gitmemo/
+├── conversations/          # [自动] AI 对话记录
+│   └── {YYYY-MM}/
+├── notes/                  # [手动] 用户笔记
+│   ├── daily/
+│   ├── manual/
+│   ├── scratch/
+│   └── voice/              # [新] 语音转文字
+├── clips/                  # [新] 剪贴板捕获
+│   └── {YYYY-MM-DD}/
+├── webclips/               # [新] 浏览器剪藏
+│   └── {domain}/
+├── terminal/               # [新] 终端命令记录
+│   └── {YYYY-MM-DD}.md
+├── imports/                # [新] 文件导入
+│   └── {source}/
+├── messages/               # [新] IM 消息
+│   └── {platform}/
+├── feeds/                  # [新] RSS/Newsletter
+│   └── {source}/
+└── .metadata/
+    └── index.db            # SQLite 全文搜索索引
+```
+
+#### 4.10 统一搜索
+
+所有来源的数据进入同一个 SQLite FTS5 索引，搜索时不区分来源：
+
+```bash
+gitmemo search "kubernetes"
+# 结果来自：对话、笔记、剪贴板、网页、终端、导入...
+# 每条结果标注来源类型和时间
+
+gitmemo search "kubernetes" --type clip     # 只搜剪贴板
+gitmemo search "kubernetes" --after 7d      # 最近7天
+gitmemo search "kubernetes" --tag devops    # 按标签筛选
+```
+
+### Phase 5：Web UI + 团队协作（v0.3）
+
+- [ ] Web UI：本地启动浏览器查看所有数据
+- [ ] 团队共享仓库 + 权限管理
+- [ ] 插件系统：自定义捕获源和导出目标
+- [ ] AI 自动总结：周/月知识回顾
+- [ ] 知识图谱：可视化内容关联
 
 ---
 
