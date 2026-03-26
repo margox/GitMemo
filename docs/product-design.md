@@ -477,17 +477,26 @@ Claude: [调用 create_manual] 已创建《Kubernetes 使用指南》...
 | 语音备忘 `voice` | 录音→Whisper 转文字→Markdown | P2 |
 | RSS 订阅 `subscribe` | 自动收集 Newsletter/博客 | P3 |
 
-### 第 5 层：生态扩展（v0.3）
+### 第 5 层：桌面客户端（v0.3）
 
-**长期愿景**
+**从 CLI 走向可视化，但依然保持本地优先**
 
 | 功能 | 描述 | 优先级 |
 |------|------|--------|
-| Web UI | 浏览器查看所有数据，统一搜索 | P3 |
-| 团队协作 | 共享仓库、权限管理 | P3 |
+| Tauri 桌面客户端 | 本地客户端，统一浏览/搜索所有数据，跨平台 | P2 |
 | 插件系统 | 自定义捕获源和导出目标 | P3 |
 | AI 自动总结 | 周/月知识回顾 | P3 |
 | 知识图谱 | 可视化内容关联 | P3 |
+
+### 第 6 层：团队协作（远期，架构预留）
+
+**短期不实现，但技术架构已为此预留扩展点**
+
+| 功能 | 描述 | 优先级 |
+|------|------|--------|
+| 团队共享仓库 | 基于 Git 多仓库/分支的团队知识共享 | P4 |
+| 权限管理 | 读写权限、目录级别 ACL | P4 |
+| 审计日志 | 操作追踪、变更历史 | P4 |
 
 ---
 
@@ -535,6 +544,7 @@ Claude: [调用 create_manual] 已创建《Kubernetes 使用指南》...
 3. **Git 原生**：不是"支持 Git"，而是"就是一个 Git 仓库"
 4. **双模式**：自动记录 + 主动笔记，一个工具解决两个问题
 5. **开源免费**：没有商业风险，社区驱动
+6. **Tauri 桌面客户端**：CLI + GUI 双入口，Rust 后端复用，安装包极轻量
 
 ---
 
@@ -544,9 +554,9 @@ Claude: [调用 create_manual] 已创建《Kubernetes 使用指南》...
 
 对话记录必须自动、静默、零干扰。笔记功能是可选的增值。用户可以只用自动记录功能，永远不碰笔记功能，产品依然有价值。
 
-### 2. Git 是用户界面
+### 2. Git 是底层，CLI 是默认，GUI 是增强
 
-不需要专门的 GUI。`conversations/` 和 `notes/` 目录就是用户的数据，Markdown 文件就是用户的界面。用户可以用任何编辑器打开、用 `git log` 查看历史、用 `git diff` 对比变更。
+数据层面，`conversations/` 和 `notes/` 目录就是用户的数据，Markdown 文件是通用格式。CLI 覆盖所有功能，Tauri 桌面客户端作为可视化增强层，提供更好的浏览和搜索体验，但不是必需品。
 
 ### 3. 笔记功能保持轻量
 
@@ -571,8 +581,9 @@ Claude: [调用 create_manual] 已创建《Kubernetes 使用指南》...
 | 层级 | 内容 | 价格 |
 |------|------|------|
 | **开源版** | CLI 工具 + 自动记录 + Git 同步 + 笔记 + MCP Server | 免费 |
-| **云端版**（未来） | 托管 Git 仓库 + Web UI + 全文搜索 + 数据统计 | $5/月 或 ¥29/月 |
-| **团队版**（未来） | 共享仓库 + 权限管理 + 审计日志 + 优先支持 | $15/人/月 |
+| **云端版**（未来） | 托管 Git 仓库 + 全文搜索 + 数据统计 | $5/月 或 ¥29/月 |
+| **桌面 Pro 版**（未来） | Tauri 客户端增强功能（AI 自动总结、知识图谱、高级搜索） | 一次性 $19 或 ¥99 |
+| **团队版**（远期） | 共享仓库 + 权限管理 + 审计日志 + 优先支持 | $15/人/月 |
 
 ### 9.2 为什么选择开源免费
 
@@ -587,7 +598,7 @@ Claude: [调用 create_manual] 已创建《Kubernetes 使用指南》...
 |------|---------|---------|
 | Phase 1-3 | 无收入，专注用户增长 | 0-3 个月 |
 | Phase 4 | GitHub Sponsors / Open Collective | 3-6 个月 |
-| Phase 5 | 云端托管版订阅 | 6-12 个月 |
+| Phase 5 | Tauri 桌面 Pro 版 + 云端托管版 | 6-12 个月 |
 | Phase 6 | 团队版 + 企业定制 | 12+ 个月 |
 
 ---
@@ -674,8 +685,14 @@ Claude: [调用 create_manual] 已创建《Kubernetes 使用指南》...
 | CLI 框架 | `clap` | Rust 生态标准 |
 | 配置格式 | TOML | Rust 生态标准，人类可读 |
 | JSON 操作 | `serde_json` | 读写 settings.json / .claude.json |
+| 桌面客户端 | **Tauri 2.0** | Rust 后端复用核心逻辑，安装包 < 10MB，跨平台 |
+| 前端框架 | Svelte / React | 轻量高效，配合 TailwindCSS |
+| IPC | Tauri Commands | Rust ↔ 前端直接调用，无需 HTTP 中间层 |
 
-**注意**：不再需要文件监控（`notify`）和守护进程（`launchd`/`systemd`），因为对话捕获由 CLAUDE.md 指令驱动，Git 同步由 PostToolUse Hook 驱动。
+**架构决策说明**：
+- CLI 和 Tauri 客户端共享同一个 Rust core crate，避免逻辑重复
+- 不需要文件监控（`notify`）和守护进程（`launchd`/`systemd`），对话捕获由 CLAUDE.md 指令驱动，Git 同步由 PostToolUse Hook 驱动
+- Tauri 选择理由（vs Electron）：Rust 原生集成、安装包体积小 10x、内存占用低、与现有 Rust 代码库无缝对接
 
 ---
 
@@ -913,13 +930,69 @@ gitmemo search "kubernetes" --after 7d      # 最近7天
 gitmemo search "kubernetes" --tag devops    # 按标签筛选
 ```
 
-### Phase 5：Web UI + 团队协作（v0.3）
+### Phase 5：Tauri 桌面客户端（v0.3）
 
-- [ ] Web UI：本地启动浏览器查看所有数据
-- [ ] 团队共享仓库 + 权限管理
+**目标**：用 Tauri 构建跨平台桌面客户端，统一可视化管理所有数据
+
+- [ ] Tauri + React/Svelte 前端框架搭建
+- [ ] 全局搜索面板（Spotlight 风格，快捷键唤起）
+- [ ] 对话/笔记/剪贴板/终端记录的统一浏览视图
+- [ ] 标签管理与筛选
+- [ ] 数据统计 Dashboard（对话频率、热门话题、知识增长趋势）
 - [ ] 插件系统：自定义捕获源和导出目标
 - [ ] AI 自动总结：周/月知识回顾
-- [ ] 知识图谱：可视化内容关联
+
+**技术选型**：
+- **Tauri 2.0**：Rust 后端（复用 gitmemo 核心逻辑）+ Web 前端，安装包 < 10MB
+- **前端**：Svelte/React + TailwindCSS
+- **IPC**：Tauri Commands 直接调用 Rust 函数，无需 HTTP API
+- **本地优先**：所有数据操作直接读写 `~/.gitmemo/` 目录，无云端依赖
+
+### Phase 6：团队协作（远期，架构预留）
+
+**短期不实现，但当前架构设计已预留以下扩展点：**
+
+- [ ] 多仓库 / 多 remote 支持（个人仓库 + 团队仓库并存）
+- [ ] 用户身份层（Git author / GPG 签名标识身份）
+- [ ] 目录级别权限模型（.gitmemo-acl.toml 配置）
+- [ ] 共享知识库：团队成员的公开笔记自动汇聚
+- [ ] 审计日志：基于 git log 的操作追踪
+
+#### 团队架构预留设计
+
+```
+┌────────────────────────────────────────────────┐
+│             当前单用户架构（v0.1-v0.3）           │
+│                                                │
+│  ~/.gitmemo/ ──push──▶ remote (个人仓库)        │
+│                                                │
+├────────────────────────────────────────────────┤
+│             远期团队架构（扩展方向）              │
+│                                                │
+│  ~/.gitmemo/                                   │
+│  ├── .sync-config.toml                         │
+│  │   remotes:                                  │
+│  │     - name: personal                        │
+│  │       url: git@github.com:me/notes.git      │
+│  │       paths: ["conversations/", "notes/"]   │
+│  │     - name: team                            │
+│  │       url: git@github.com:org/shared.git    │
+│  │       paths: ["shared/"]                    │
+│  │       permissions: read-write               │
+│  │                                             │
+│  ├── conversations/  → push to personal        │
+│  ├── notes/          → push to personal        │
+│  └── shared/         → push to team            │
+│      ├── knowledge/  ← pull from team members  │
+│      └── manuals/    ← collaborative editing   │
+└────────────────────────────────────────────────┘
+```
+
+**关键架构决策**：
+1. **多 remote 而非单仓库分支**：个人数据和团队数据物理隔离，隐私可控
+2. **路径级别的 remote 映射**：不同目录可推送到不同仓库
+3. **权限模型基于配置文件**：`.gitmemo-acl.toml` 定义目录级读写权限，Git 原生机制保障
+4. **身份基于 Git 作者信息**：无需额外的用户系统，GPG 签名可选
 
 ---
 
