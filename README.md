@@ -97,7 +97,7 @@ Follow the prompts: choose your editor, enter your Git remote URL (auto-detected
 
 ### That's It
 
-Your AI conversations will now auto-save to the Git repo. **Restart your editor session** to activate the new configuration.
+Your AI conversations will now auto-save to the Git repo. Try typing `/save` in Claude — it works without restarting. If it doesn't take effect, restart your editor session.
 
 ### How Conversations Are Saved
 

@@ -273,11 +273,11 @@ fn cmd_init(git_url: Option<String>, path: Option<String>, no_mcp: bool, editor:
     println!();
     println!("  下一步：");
     if install_claude {
-        println!("    1. {} 重启 Claude 会话（使配置生效）", style("必须").bold());
-        println!("    2. 在 Claude 中输入 {} 保存当前会话", style("/save").cyan());
+        println!("    1. 在 Claude 中输入 {} 试试保存当前会话（无需重启）", style("/save").cyan());
+        println!("    2. 如果 /save 未生效，重启 Claude 会话即可");
     }
     if install_cursor {
-        println!("    1. {} 重启 Cursor（使配置生效）", style("必须").bold());
+        println!("    1. {} 重启 Cursor（使配置生效）", style("建议").bold());
         println!("    2. 对话保存后会自动通过 MCP 同步到 Git", );
     }
     println!();

@@ -24,7 +24,7 @@ gitmemo init
 2. **Enter your Git remote URL** (for syncing conversations)
 3. **Generate an SSH key** (add to your repo's Deploy Keys)
 
-After init, **restart your editor session** to activate.
+After init, try `/save` right away — no restart needed. If it doesn't work, restart your editor session.
 
 ### Specify editor directly (non-interactive)
 
