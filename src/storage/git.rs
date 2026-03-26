@@ -53,6 +53,14 @@ pub fn commit_and_push(repo_path: &Path, message: &str) -> Result<()> {
         repo.commit(Some("HEAD"), &sig, &sig, message, &tree, &[])?;
     }
 
+    // Push using system git (handles SSH auth via ssh-agent / system keychain)
+    let _ = std::process::Command::new("git")
+        .args(["push", "origin", "HEAD"])
+        .current_dir(repo_path)
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn();
+
     Ok(())
 }
 

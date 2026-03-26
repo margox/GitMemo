@@ -187,23 +187,30 @@ fn cmd_init(git_url: Option<String>, path: Option<String>, no_mcp: bool) -> Resu
     // 9. Initial commit
     storage::git::commit_and_push(&sync_dir, "init: gitmemo")?;
 
-    // 10. Show public key
+    // 10. Show public key and next steps
     println!();
-    println!(
-        "  {} 请将以下公钥添加到仓库的 Deploy Keys（允许写入）：",
-        style("→").yellow()
-    );
-    println!();
-    println!("  {}", style(&pub_key).dim());
-    println!();
+    if is_new_key {
+        println!(
+            "  {} 请将以下公钥添加到仓库的 Deploy Keys（允许写入）：",
+            style("→").yellow()
+        );
+        println!();
+        println!("  {}", style(&pub_key).dim());
+        println!();
+    }
     println!(
         "  {}",
-        style("一切就绪！从现在起对话将自动保存到 Git 仓库。").green()
+        style("一切就绪！").green().bold()
     );
-    println!(
-        "  运行 {} 查看更多命令。",
-        style("gitmemo help").bold()
-    );
+    println!();
+    println!("  下一步：");
+    println!("    1. {} 重启 Claude 会话（使配置生效）", style("必须").bold());
+    println!("    2. 正常使用 Claude，对话将自动保存");
+    println!();
+    println!("  验证是否生效：");
+    println!("    {} 查看已保存的对话", style("gitmemo status").cyan());
+    println!("    {} 查看 Git 提交记录", style("gitmemo recent").cyan());
+    println!("    {} 手动测试", style("gitmemo note \"hello world\"").cyan());
     println!();
 
     Ok(())

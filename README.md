@@ -72,7 +72,24 @@ Follow the prompts: enter your Git remote URL (auto-detected for existing repos)
 
 ### That's It
 
-Your Claude conversations will now auto-save to the Git repo. No further action needed. Restart your Claude session to activate.
+Your Claude conversations will now auto-save to the Git repo. **Restart your Claude session** to activate the new configuration.
+
+### Verify It Works
+
+After restarting Claude, have a conversation, then check:
+
+```bash
+# Check if conversations were saved
+ls ~/.gitmemo/conversations/
+
+# Or check git log
+cd ~/.gitmemo && git log --oneline -5
+
+# Or use the status command
+gitmemo status
+```
+
+If you see new Markdown files in `conversations/`, it's working.
 
 ## Commands
 
