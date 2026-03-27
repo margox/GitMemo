@@ -26,15 +26,45 @@ interface DesktopSettings {
   clipboard_autostart: boolean;
 }
 
+function Toggle({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
+  return (
+    <button
+      onClick={onToggle}
+      style={{
+        width: 44,
+        height: 24,
+        borderRadius: 12,
+        background: enabled ? "var(--accent)" : "#333",
+        position: "relative",
+        border: "none",
+        cursor: "pointer",
+        transition: "background 0.2s",
+        flexShrink: 0,
+      }}
+    >
+      <div
+        style={{
+          width: 18,
+          height: 18,
+          borderRadius: 9,
+          background: "#fff",
+          position: "absolute",
+          top: 3,
+          left: enabled ? 23 : 3,
+          transition: "left 0.2s",
+        }}
+      />
+    </button>
+  );
+}
+
 export default function DashboardPage() {
   const [stats, setStats] = useState<AppStats | null>(null);
   const [status, setStatus] = useState<AppStatus | null>(null);
   const [settings, setSettings] = useState<DesktopSettings | null>(null);
   const [error, setError] = useState("");
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   const loadData = async () => {
     try {
@@ -56,9 +86,7 @@ export default function DashboardPage() {
     try {
       await invoke<string>("set_autostart", { enabled: !settings.autostart });
       setSettings({ ...settings, autostart: !settings.autostart });
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const toggleClipboardAutostart = async () => {
@@ -66,19 +94,17 @@ export default function DashboardPage() {
     try {
       await invoke<string>("set_clipboard_autostart", { enabled: !settings.clipboard_autostart });
       setSettings({ ...settings, clipboard_autostart: !settings.clipboard_autostart });
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   if (error) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center px-8">
-          <GitBranch size={40} style={{ color: "var(--border)" }} className="mx-auto mb-4" />
-          <p className="text-[15px] mb-2" style={{ color: "var(--red)" }}>{error}</p>
-          <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
-            Run <code className="px-1.5 py-0.5 rounded" style={{ background: "var(--bg-hover)" }}>gitmemo init</code> to get started
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
+        <div style={{ textAlign: "center", padding: "0 32px" }}>
+          <GitBranch size={48} style={{ color: "#555", margin: "0 auto 16px" }} />
+          <p style={{ fontSize: 16, color: "var(--red)", marginBottom: 8 }}>{error}</p>
+          <p style={{ fontSize: 13, color: "var(--text-secondary)" }}>
+            Run <code style={{ background: "var(--bg-hover)", padding: "2px 8px", borderRadius: 4 }}>gitmemo init</code> to get started
           </p>
         </div>
       </div>
@@ -87,7 +113,7 @@ export default function DashboardPage() {
 
   if (!stats || !status) {
     return (
-      <div className="flex items-center justify-center h-full">
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
         <p style={{ color: "var(--text-secondary)" }}>Loading...</p>
       </div>
     );
@@ -100,54 +126,69 @@ export default function DashboardPage() {
     { icon: FileText, label: "Scratch Notes", value: stats.scratch_notes, color: "#c084fc" },
   ];
 
-  return (
-    <div className="p-6 overflow-y-auto h-full">
-      <h1 className="text-[20px] font-bold mb-6">Dashboard</h1>
+  const cardStyle = {
+    background: "var(--bg-card)",
+    border: "1px solid var(--border)",
+    borderRadius: 10,
+    padding: "20px 24px",
+  };
 
-      {/* Stat Cards */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
+  return (
+    <div style={{ padding: "20px 32px 32px", overflowY: "auto", height: "100%" }}>
+      <h1 style={{ fontSize: 22, fontWeight: 700, marginBottom: 20 }}>Dashboard</h1>
+
+      {/* Stat Cards - 2x2 grid */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
         {cards.map((card) => {
           const Icon = card.icon;
           return (
-            <div
-              key={card.label}
-              className="p-4 rounded-lg border"
-              style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}
-            >
-              <div className="flex items-center gap-3 mb-3">
-                <Icon size={18} style={{ color: card.color }} />
-                <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>{card.label}</span>
+            <div key={card.label} style={cardStyle}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 14 }}>
+                <div style={{
+                  width: 32, height: 32, borderRadius: 8,
+                  background: `${card.color}15`,
+                  display: "flex", alignItems: "center", justifyContent: "center",
+                }}>
+                  <Icon size={16} style={{ color: card.color }} />
+                </div>
+                <span style={{ fontSize: 12, color: "var(--text-secondary)", fontWeight: 500 }}>{card.label}</span>
               </div>
-              <p className="text-[28px] font-bold">{card.value}</p>
+              <p style={{ fontSize: 32, fontWeight: 700, letterSpacing: -1 }}>{card.value}</p>
             </div>
           );
         })}
       </div>
 
       {/* Info Cards */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="p-4 rounded-lg border" style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}>
-          <div className="flex items-center gap-2 mb-3">
-            <HardDrive size={16} style={{ color: "var(--text-secondary)" }} />
-            <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>Storage</span>
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 32 }}>
+        <div style={cardStyle}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <HardDrive size={14} style={{ color: "var(--text-secondary)" }} />
+            <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Storage</span>
           </div>
-          <p className="text-[16px] font-semibold">{stats.total_size_kb.toFixed(1)} KB</p>
-          <p className="text-[11px] mt-1" style={{ color: "var(--text-secondary)" }}>{status.sync_dir}</p>
+          <p style={{ fontSize: 18, fontWeight: 600 }}>
+            {stats.total_size_kb >= 1024
+              ? `${(stats.total_size_kb / 1024).toFixed(1)} MB`
+              : `${stats.total_size_kb.toFixed(1)} KB`}
+          </p>
+          <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {status.sync_dir}
+          </p>
         </div>
 
-        <div className="p-4 rounded-lg border" style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}>
-          <div className="flex items-center gap-2 mb-3">
-            <GitBranch size={16} style={{ color: "var(--text-secondary)" }} />
-            <span className="text-[12px]" style={{ color: "var(--text-secondary)" }}>Git Status</span>
+        <div style={cardStyle}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <GitBranch size={14} style={{ color: "var(--text-secondary)" }} />
+            <span style={{ fontSize: 12, color: "var(--text-secondary)" }}>Git Status</span>
           </div>
-          <p className="text-[14px] font-semibold">
+          <p style={{ fontSize: 18, fontWeight: 600 }}>
             {status.unpushed > 0 ? (
               <span style={{ color: "var(--yellow)" }}>{status.unpushed} unpushed</span>
             ) : (
               <span style={{ color: "var(--green)" }}>Synced</span>
             )}
           </p>
-          <p className="text-[11px] mt-1 truncate" style={{ color: "var(--text-secondary)" }} title={status.git_remote}>
+          <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 6, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }} title={status.git_remote}>
             {status.git_remote || "No remote configured"}
           </p>
         </div>
@@ -155,54 +196,41 @@ export default function DashboardPage() {
 
       {/* Settings */}
       {settings && (
-        <div className="rounded-lg border p-4" style={{ background: "var(--bg-card)", borderColor: "var(--border)" }}>
-          <div className="flex items-center gap-2 mb-4">
-            <Settings size={16} style={{ color: "var(--text-secondary)" }} />
-            <span className="text-[14px] font-semibold">Settings</span>
-          </div>
-
-          <div className="space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Power size={14} style={{ color: "var(--text-secondary)" }} />
-                <span className="text-[13px]">Launch at login</span>
-              </div>
-              <button
-                onClick={toggleAutostart}
-                className="w-10 h-5 rounded-full relative transition-colors"
-                style={{ background: settings.autostart ? "var(--accent)" : "var(--bg-hover)" }}
-              >
-                <div
-                  className="w-4 h-4 rounded-full absolute top-0.5 transition-all"
-                  style={{
-                    background: "#fff",
-                    left: settings.autostart ? "22px" : "2px",
-                  }}
-                />
-              </button>
+        <>
+          <div style={{ borderTop: "1px solid var(--border)", marginBottom: 24 }} />
+          <div style={cardStyle}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
+              <Settings size={16} style={{ color: "var(--text-secondary)" }} />
+              <span style={{ fontSize: 15, fontWeight: 600 }}>Settings</span>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Clipboard size={14} style={{ color: "var(--text-secondary)" }} />
-                <span className="text-[13px]">Auto-start clipboard monitor</span>
+            <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <Power size={15} style={{ color: "var(--text-secondary)" }} />
+                  <div>
+                    <p style={{ fontSize: 13, fontWeight: 500 }}>Launch at login</p>
+                    <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>Start GitMemo when you log in</p>
+                  </div>
+                </div>
+                <Toggle enabled={settings.autostart} onToggle={toggleAutostart} />
               </div>
-              <button
-                onClick={toggleClipboardAutostart}
-                className="w-10 h-5 rounded-full relative transition-colors"
-                style={{ background: settings.clipboard_autostart ? "var(--accent)" : "var(--bg-hover)" }}
-              >
-                <div
-                  className="w-4 h-4 rounded-full absolute top-0.5 transition-all"
-                  style={{
-                    background: "#fff",
-                    left: settings.clipboard_autostart ? "22px" : "2px",
-                  }}
-                />
-              </button>
+
+              <div style={{ borderTop: "1px solid var(--border)" }} />
+
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                  <Clipboard size={15} style={{ color: "var(--text-secondary)" }} />
+                  <div>
+                    <p style={{ fontSize: 13, fontWeight: 500 }}>Auto-start clipboard monitor</p>
+                    <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>Begin capturing clipboard on launch</p>
+                  </div>
+                </div>
+                <Toggle enabled={settings.clipboard_autostart} onToggle={toggleClipboardAutostart} />
+              </div>
             </div>
           </div>
-        </div>
+        </>
       )}
     </div>
   );

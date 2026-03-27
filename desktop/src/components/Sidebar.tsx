@@ -5,6 +5,8 @@ import {
   Search,
   GitBranch,
   RefreshCw,
+  Sun,
+  Moon,
 } from "lucide-react";
 import { invoke } from "@tauri-apps/api/core";
 import { useState } from "react";
@@ -13,6 +15,8 @@ import type { Page } from "../App";
 interface SidebarProps {
   currentPage: Page;
   onNavigate: (page: Page) => void;
+  theme: "dark" | "light";
+  onToggleTheme: () => void;
 }
 
 const navItems: { id: Page; icon: typeof LayoutDashboard; label: string }[] = [
@@ -22,7 +26,7 @@ const navItems: { id: Page; icon: typeof LayoutDashboard; label: string }[] = [
   { id: "search", icon: Search, label: "Search" },
 ];
 
-export default function Sidebar({ currentPage, onNavigate }: SidebarProps) {
+export default function Sidebar({ currentPage, onNavigate, theme, onToggleTheme }: SidebarProps) {
   const [syncing, setSyncing] = useState(false);
   const [syncMsg, setSyncMsg] = useState("");
 
@@ -42,20 +46,49 @@ export default function Sidebar({ currentPage, onNavigate }: SidebarProps) {
 
   return (
     <div
-      className="flex flex-col w-[200px] border-r h-full"
       style={{
+        display: "flex",
+        flexDirection: "column",
+        width: 200,
+        borderRight: "1px solid var(--border)",
+        height: "100%",
         background: "var(--bg-card)",
-        borderColor: "var(--border)",
       }}
     >
       {/* Logo */}
-      <div className="flex items-center gap-2 px-4 py-4 border-b" style={{ borderColor: "var(--border)" }}>
-        <GitBranch size={20} style={{ color: "var(--accent)" }} />
-        <span className="font-bold text-[15px]">GitMemo</span>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          padding: "16px 16px",
+          borderBottom: "1px solid var(--border)",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <GitBranch size={18} style={{ color: "var(--accent)" }} />
+          <span style={{ fontWeight: 700, fontSize: 15 }}>GitMemo</span>
+        </div>
+        <button
+          onClick={onToggleTheme}
+          style={{
+            background: "none",
+            border: "none",
+            cursor: "pointer",
+            padding: 4,
+            borderRadius: 6,
+            display: "flex",
+            alignItems: "center",
+            color: "var(--text-secondary)",
+          }}
+          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+        >
+          {theme === "dark" ? <Sun size={14} /> : <Moon size={14} />}
+        </button>
       </div>
 
       {/* Nav */}
-      <nav className="flex-1 py-2">
+      <nav style={{ flex: 1, paddingTop: 8 }}>
         {navItems.map((item) => {
           const Icon = item.icon;
           const active = currentPage === item.id;
@@ -63,11 +96,20 @@ export default function Sidebar({ currentPage, onNavigate }: SidebarProps) {
             <button
               key={item.id}
               onClick={() => onNavigate(item.id)}
-              className="flex items-center gap-3 w-full px-4 py-2.5 text-[13px] transition-colors"
               style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                width: "100%",
+                padding: "10px 16px",
+                fontSize: 13,
                 background: active ? "var(--bg-hover)" : "transparent",
                 color: active ? "var(--accent)" : "var(--text-secondary)",
                 fontWeight: active ? 600 : 400,
+                border: "none",
+                cursor: "pointer",
+                textAlign: "left",
+                transition: "background 0.15s",
               }}
             >
               <Icon size={16} />
@@ -78,22 +120,30 @@ export default function Sidebar({ currentPage, onNavigate }: SidebarProps) {
       </nav>
 
       {/* Sync button */}
-      <div className="p-3 border-t" style={{ borderColor: "var(--border)" }}>
+      <div style={{ padding: 12, borderTop: "1px solid var(--border)" }}>
         <button
           onClick={handleSync}
           disabled={syncing}
-          className="flex items-center justify-center gap-2 w-full py-2 rounded-md text-[12px] transition-colors"
           style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            width: "100%",
+            padding: "8px 0",
+            borderRadius: 6,
+            fontSize: 12,
             background: syncing ? "var(--bg-hover)" : "var(--bg)",
             color: "var(--text-secondary)",
             border: "1px solid var(--border)",
+            cursor: syncing ? "default" : "pointer",
           }}
         >
           <RefreshCw size={13} className={syncing ? "animate-spin" : ""} />
           {syncing ? "Syncing..." : "Sync to Git"}
         </button>
         {syncMsg && (
-          <p className="text-[11px] mt-1.5 text-center" style={{ color: "var(--text-secondary)" }}>
+          <p style={{ fontSize: 11, marginTop: 6, textAlign: "center", color: "var(--text-secondary)" }}>
             {syncMsg}
           </p>
         )}

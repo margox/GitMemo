@@ -112,16 +112,6 @@ pub fn run() {
                 .build(app)?;
 
             // --- Close → Hide (keep tray alive) ---
-            let main_window = app.get_webview_window("main").unwrap();
-            main_window.on_window_event(move |event| {
-                if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                    api.prevent_close();
-                    // The window variable is captured from the outer scope
-                    // We need to use the event's window reference instead
-                }
-            });
-
-            // Re-register the close handler properly
             let app_handle = app.handle().clone();
             if let Some(w) = app.get_webview_window("main") {
                 w.on_window_event(move |event| {

@@ -24,7 +24,7 @@ const tabs: { id: NoteTab; label: string; icon: typeof FileText; folder: string 
   { id: "scratch", label: "Scratch", icon: FileText, folder: "notes/scratch" },
   { id: "daily", label: "Daily", icon: Calendar, folder: "notes/daily" },
   { id: "manual", label: "Manual", icon: BookOpen, folder: "notes/manual" },
-  { id: "conversations", label: "Conversations", icon: FileText, folder: "conversations" },
+  { id: "conversations", label: "Chats", icon: FileText, folder: "conversations" },
 ];
 
 export default function NotesPage({ focusTrigger }: { focusTrigger?: number }) {
@@ -48,9 +48,7 @@ export default function NotesPage({ focusTrigger }: { focusTrigger?: number }) {
   }, [activeTab]);
 
   useEffect(() => {
-    if (focusTrigger && textareaRef.current) {
-      textareaRef.current.focus();
-    }
+    if (focusTrigger && textareaRef.current) textareaRef.current.focus();
   }, [focusTrigger]);
 
   const loadFiles = async () => {
@@ -59,11 +57,8 @@ export default function NotesPage({ focusTrigger }: { focusTrigger?: number }) {
       const folder = tabs.find((t) => t.id === activeTab)!.folder;
       const result = await invoke<FileEntry[]>("list_files", { folder });
       setFiles(result);
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   };
 
   const openFile = async (path: string) => {
@@ -72,9 +67,7 @@ export default function NotesPage({ focusTrigger }: { focusTrigger?: number }) {
       setSelectedFile(path);
       setFileContent(content);
       setEditing(false);
-    } catch (e) {
-      console.error(e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const handleCreateNote = async () => {
@@ -86,32 +79,21 @@ export default function NotesPage({ focusTrigger }: { focusTrigger?: number }) {
       } else {
         result = await invoke<NoteResult>("create_note", { content: newNote });
       }
-      setToast(result.message);
+      showToast(result.message);
       setNewNote("");
       loadFiles();
-      setTimeout(() => setToast(""), 2500);
-    } catch (e) {
-      setToast(`Error: ${e}`);
-      setTimeout(() => setToast(""), 3000);
-    }
+    } catch (e) { showToast(`Error: ${e}`, true); }
   };
 
   const handleSaveEdit = async () => {
     if (!selectedFile) return;
     try {
-      const result = await invoke<NoteResult>("update_note", {
-        filePath: selectedFile,
-        content: editContent,
-      });
+      const result = await invoke<NoteResult>("update_note", { filePath: selectedFile, content: editContent });
       setFileContent(editContent);
       setEditing(false);
-      setToast(result.message);
+      showToast(result.message);
       loadFiles();
-      setTimeout(() => setToast(""), 2500);
-    } catch (e) {
-      setToast(`Error: ${e}`);
-      setTimeout(() => setToast(""), 3000);
-    }
+    } catch (e) { showToast(`Error: ${e}`, true); }
   };
 
   const handleDelete = async () => {
@@ -121,13 +103,9 @@ export default function NotesPage({ focusTrigger }: { focusTrigger?: number }) {
       setSelectedFile(null);
       setFileContent("");
       setEditing(false);
-      setToast("Note deleted");
+      showToast("Note deleted");
       loadFiles();
-      setTimeout(() => setToast(""), 2500);
-    } catch (e) {
-      setToast(`Error: ${e}`);
-      setTimeout(() => setToast(""), 3000);
-    }
+    } catch (e) { showToast(`Error: ${e}`, true); }
   };
 
   const startEdit = () => {
@@ -136,28 +114,23 @@ export default function NotesPage({ focusTrigger }: { focusTrigger?: number }) {
     setTimeout(() => editRef.current?.focus(), 50);
   };
 
-  const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) {
-      handleCreateNote();
-    }
-  };
-
-  const handleEditKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === "s" && (e.metaKey || e.ctrlKey)) {
-      e.preventDefault();
-      handleSaveEdit();
-    }
-    if (e.key === "Escape") {
-      setEditing(false);
-    }
+  const showToast = (msg: string, isError = false) => {
+    setToast(isError ? `Error: ${msg}` : msg);
+    setTimeout(() => setToast(""), 2500);
   };
 
   return (
-    <div className="flex h-full">
-      {/* File List */}
-      <div className="w-[280px] border-r flex flex-col h-full" style={{ borderColor: "var(--border)" }}>
+    <div style={{ display: "flex", height: "100%" }}>
+      {/* Left Panel - File List */}
+      <div style={{
+        width: 300, borderRight: "1px solid var(--border)",
+        display: "flex", flexDirection: "column", height: "100%",
+      }}>
         {/* Tabs */}
-        <div className="flex border-b" style={{ borderColor: "var(--border)" }}>
+        <div style={{
+          display: "flex", borderBottom: "1px solid var(--border)",
+          padding: "0 8px",
+        }}>
           {tabs.map((tab) => {
             const Icon = tab.icon;
             const active = activeTab === tab.id;
@@ -165,10 +138,14 @@ export default function NotesPage({ focusTrigger }: { focusTrigger?: number }) {
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id)}
-                className="flex-1 flex items-center justify-center gap-1 py-2.5 text-[11px] transition-colors border-b-2"
                 style={{
-                  borderColor: active ? "var(--accent)" : "transparent",
+                  flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
+                  gap: 4, padding: "12px 4px", fontSize: 11, cursor: "pointer",
+                  borderBottom: `2px solid ${active ? "var(--accent)" : "transparent"}`,
                   color: active ? "var(--accent)" : "var(--text-secondary)",
+                  background: "none", border: "none",
+                  borderBottomStyle: "solid", borderBottomWidth: 2,
+                  borderBottomColor: active ? "var(--accent)" : "transparent",
                 }}
               >
                 <Icon size={12} />
@@ -180,27 +157,27 @@ export default function NotesPage({ focusTrigger }: { focusTrigger?: number }) {
 
         {/* Quick note input */}
         {(activeTab === "scratch" || activeTab === "daily") && (
-          <div className="p-3 border-b" style={{ borderColor: "var(--border)" }}>
-            <div className="relative">
+          <div style={{ padding: 14, borderBottom: "1px solid var(--border)" }}>
+            <div style={{ position: "relative" }}>
               <textarea
                 ref={textareaRef}
                 value={newNote}
                 onChange={(e) => setNewNote(e.target.value)}
-                onKeyDown={handleKeyDown}
+                onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleCreateNote(); }}
                 placeholder={activeTab === "daily" ? "Add to today's note..." : "Quick note..."}
-                rows={2}
-                className="w-full px-3 py-2 rounded-md text-[13px] resize-none"
+                rows={3}
                 style={{
-                  background: "var(--bg)",
-                  border: "1px solid var(--border)",
-                  color: "var(--text)",
+                  width: "100%", padding: "10px 12px", borderRadius: 8, fontSize: 13,
+                  resize: "none", background: "var(--bg)", color: "var(--text)",
+                  border: "1px solid var(--border)", fontFamily: "inherit",
                 }}
               />
               <button
                 onClick={handleCreateNote}
                 disabled={!newNote.trim()}
-                className="absolute bottom-2 right-2 p-1 rounded"
                 style={{
+                  position: "absolute", bottom: 8, right: 8, padding: 4,
+                  borderRadius: 4, background: "none", border: "none", cursor: "pointer",
                   color: newNote.trim() ? "var(--accent)" : "var(--text-secondary)",
                   opacity: newNote.trim() ? 1 : 0.4,
                 }}
@@ -208,28 +185,28 @@ export default function NotesPage({ focusTrigger }: { focusTrigger?: number }) {
                 <Send size={14} />
               </button>
             </div>
-            <p className="text-[10px] mt-1" style={{ color: "var(--text-secondary)" }}>
+            <p style={{ fontSize: 10, marginTop: 6, color: "var(--text-secondary)" }}>
               Cmd+Enter to save
             </p>
           </div>
         )}
 
         {/* File list */}
-        <div className="flex-1 overflow-y-auto">
+        <div style={{ flex: 1, overflowY: "auto" }}>
           {loading ? (
-            <p className="p-4 text-[12px]" style={{ color: "var(--text-secondary)" }}>Loading...</p>
+            <p style={{ padding: 20, fontSize: 12, color: "var(--text-secondary)" }}>Loading...</p>
           ) : files.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-              <FileText size={32} style={{ color: "var(--border)" }} className="mb-3" />
-              <p className="text-[13px] mb-1" style={{ color: "var(--text-secondary)" }}>
+            <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 20px", textAlign: "center" }}>
+              <FileText size={36} style={{ color: "var(--border)", marginBottom: 12 }} />
+              <p style={{ fontSize: 13, color: "var(--text-secondary)", marginBottom: 4 }}>
                 No {activeTab} notes yet
               </p>
-              <p className="text-[11px]" style={{ color: "var(--text-secondary)" }}>
+              <p style={{ fontSize: 11, color: "var(--text-secondary)" }}>
                 {activeTab === "scratch" || activeTab === "daily"
                   ? "Use the input above to create one"
                   : activeTab === "manual"
-                  ? "Create manuals via CLI: gitmemo manual"
-                  : "Conversations are saved automatically"}
+                  ? "Create via CLI: gitmemo manual"
+                  : "Saved automatically from AI chats"}
               </p>
             </div>
           ) : (
@@ -237,17 +214,21 @@ export default function NotesPage({ focusTrigger }: { focusTrigger?: number }) {
               <button
                 key={file.path}
                 onClick={() => openFile(file.path)}
-                className="w-full text-left px-3 py-2.5 border-b transition-colors"
                 style={{
-                  borderColor: "var(--border)",
+                  width: "100%", textAlign: "left", padding: "12px 16px",
+                  borderBottom: "1px solid var(--border)", cursor: "pointer",
                   background: selectedFile === file.path ? "var(--bg-hover)" : "transparent",
+                  border: "none", color: "var(--text)",
+                  borderBottomStyle: "solid", borderBottomWidth: 1, borderBottomColor: "var(--border)",
                 }}
               >
-                <p className="text-[13px] font-medium truncate">{file.name}</p>
-                <p className="text-[11px] mt-0.5 truncate" style={{ color: "var(--text-secondary)" }}>
+                <p style={{ fontSize: 13, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                  {file.name}
+                </p>
+                <p style={{ fontSize: 11, marginTop: 4, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                   {file.preview}
                 </p>
-                <p className="text-[10px] mt-0.5" style={{ color: "var(--text-secondary)" }}>
+                <p style={{ fontSize: 10, marginTop: 4, color: "var(--text-secondary)" }}>
                   {file.modified}
                 </p>
               </button>
@@ -257,83 +238,67 @@ export default function NotesPage({ focusTrigger }: { focusTrigger?: number }) {
 
         {/* Toast */}
         {toast && (
-          <div
-            className="mx-3 mb-3 px-3 py-2 rounded-md text-[12px]"
-            style={{
-              background: toast.startsWith("Error") ? "#2d1515" : "#152d15",
-              color: toast.startsWith("Error") ? "var(--red)" : "var(--green)",
-            }}
-          >
+          <div style={{
+            margin: "0 12px 12px", padding: "8px 12px", borderRadius: 6, fontSize: 12,
+            background: toast.startsWith("Error") ? "#2d1515" : "#152d15",
+            color: toast.startsWith("Error") ? "var(--red)" : "var(--green)",
+          }}>
             {toast}
           </div>
         )}
       </div>
 
-      {/* Content Panel */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
+      {/* Right Panel - Content */}
+      <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
         {selectedFile ? (
           <>
-            <div
-              className="flex items-center gap-2 px-4 py-3 border-b"
-              style={{ borderColor: "var(--border)" }}
-            >
+            <div style={{
+              display: "flex", alignItems: "center", gap: 8,
+              padding: "12px 20px", borderBottom: "1px solid var(--border)",
+            }}>
               <button
                 onClick={() => { setSelectedFile(null); setFileContent(""); setEditing(false); }}
-                className="p-1 rounded hover:bg-[var(--bg-hover)]"
+                style={{ padding: 4, borderRadius: 4, background: "none", border: "none", cursor: "pointer", color: "var(--text-secondary)" }}
               >
-                <ChevronLeft size={16} style={{ color: "var(--text-secondary)" }} />
+                <ChevronLeft size={16} />
               </button>
-              <span className="text-[13px] truncate flex-1" style={{ color: "var(--text-secondary)" }}>
+              <span style={{ flex: 1, fontSize: 12, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {selectedFile}
               </span>
               {editing ? (
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={handleSaveEdit}
-                    className="flex items-center gap-1 px-2 py-1 rounded text-[11px]"
-                    style={{ background: "#0f2d0f", color: "var(--green)" }}
-                  >
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button onClick={handleSaveEdit} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, fontSize: 11, background: "#0f2d0f", color: "var(--green)", border: "none", cursor: "pointer" }}>
                     <Save size={12} /> Save
                   </button>
-                  <button
-                    onClick={() => setEditing(false)}
-                    className="p-1 rounded hover:bg-[var(--bg-hover)]"
-                  >
-                    <X size={14} style={{ color: "var(--text-secondary)" }} />
+                  <button onClick={() => setEditing(false)} style={{ padding: 4, borderRadius: 4, background: "none", border: "none", cursor: "pointer", color: "var(--text-secondary)" }}>
+                    <X size={14} />
                   </button>
                 </div>
               ) : (
-                <div className="flex items-center gap-1">
-                  <button
-                    onClick={startEdit}
-                    className="flex items-center gap-1 px-2 py-1 rounded text-[11px] hover:bg-[var(--bg-hover)]"
-                    style={{ color: "var(--text-secondary)" }}
-                  >
+                <div style={{ display: "flex", gap: 4 }}>
+                  <button onClick={startEdit} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, fontSize: 11, background: "none", border: "none", cursor: "pointer", color: "var(--text-secondary)" }}>
                     <Pencil size={12} /> Edit
                   </button>
-                  <button
-                    onClick={handleDelete}
-                    className="p-1 rounded hover:bg-[var(--bg-hover)]"
-                    style={{ color: "var(--red)" }}
-                  >
+                  <button onClick={handleDelete} style={{ padding: 4, borderRadius: 4, background: "none", border: "none", cursor: "pointer", color: "var(--red)" }}>
                     <Trash2 size={13} />
                   </button>
                 </div>
               )}
             </div>
-            <div className="flex-1 overflow-y-auto p-5">
+            <div style={{ flex: 1, overflowY: "auto", padding: "20px 28px" }}>
               {editing ? (
                 <textarea
                   ref={editRef}
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
-                  onKeyDown={handleEditKeyDown}
-                  className="w-full h-full resize-none text-[13px] leading-6 p-0"
+                  onKeyDown={(e) => {
+                    if (e.key === "s" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleSaveEdit(); }
+                    if (e.key === "Escape") setEditing(false);
+                  }}
                   style={{
-                    background: "transparent",
-                    color: "var(--text)",
-                    border: "none",
-                    outline: "none",
+                    width: "100%", height: "100%", resize: "none", fontSize: 13,
+                    lineHeight: 1.7, padding: 0, background: "transparent", color: "var(--text)",
+                    border: "none", outline: "none",
                     fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
                   }}
                 />
@@ -343,13 +308,13 @@ export default function NotesPage({ focusTrigger }: { focusTrigger?: number }) {
             </div>
           </>
         ) : (
-          <div className="flex items-center justify-center h-full">
-            <div className="text-center">
-              <Plus size={32} style={{ color: "var(--border)" }} className="mx-auto mb-3" />
-              <p className="text-[13px]" style={{ color: "var(--text-secondary)" }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
+            <div style={{ textAlign: "center" }}>
+              <Plus size={36} style={{ color: "var(--border)", margin: "0 auto 12px" }} />
+              <p style={{ fontSize: 14, color: "var(--text-secondary)" }}>
                 Select a file or create a new note
               </p>
-              <p className="text-[11px] mt-1" style={{ color: "var(--text-secondary)" }}>
+              <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 6 }}>
                 Cmd+N to quick create
               </p>
             </div>

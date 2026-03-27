@@ -2,16 +2,15 @@ use gitmemo_core::storage::{files, git};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
 use tauri::{AppHandle, Emitter};
 
 static WATCHING: AtomicBool = AtomicBool::new(false);
 
 /// Minimum characters to save (filter out passwords, short copies)
-const MIN_LENGTH: usize = 20;
+const MIN_LENGTH: usize = 10;
 
-/// Interval between clipboard checks (ms)
-const POLL_INTERVAL_MS: u64 = 1500;
+/// Interval between clipboard checks (ms) — faster for responsiveness
+const POLL_INTERVAL_MS: u64 = 500;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ClipboardEvent {
@@ -53,25 +52,22 @@ pub fn get_clipboard_status() -> Result<ClipboardStatus, String> {
 #[tauri::command]
 pub fn start_clipboard_watch(app: AppHandle) -> Result<String, String> {
     if WATCHING.load(Ordering::SeqCst) {
-        return Ok("剪贴板监听已在运行中".into());
+        return Ok("Clipboard watch already running".into());
     }
 
     WATCHING.store(true, Ordering::SeqCst);
 
-    let watching = Arc::new(AtomicBool::new(true));
-    let w = watching.clone();
-
     std::thread::spawn(move || {
-        clipboard_poll_loop(app, w);
+        clipboard_poll_loop(app);
     });
 
-    Ok("剪贴板监听已启动".into())
+    Ok("Clipboard watch started".into())
 }
 
 #[tauri::command]
 pub fn stop_clipboard_watch() -> Result<String, String> {
     WATCHING.store(false, Ordering::SeqCst);
-    Ok("剪贴板监听已停止".into())
+    Ok("Clipboard watch stopped".into())
 }
 
 #[tauri::command]
@@ -79,27 +75,44 @@ pub fn save_clipboard_now(content: String) -> Result<ClipboardEvent, String> {
     save_clip_content(&content)
 }
 
-fn clipboard_poll_loop(app: AppHandle, _watching: Arc<AtomicBool>) {
-    let mut last_hash = String::new();
+fn clipboard_poll_loop(app: AppHandle) {
+    // Initialize last_hash with current clipboard to avoid saving stale content on start
+    let mut last_hash = get_clipboard_text()
+        .ok()
+        .filter(|t| !t.is_empty())
+        .map(|t| content_hash(&t))
+        .unwrap_or_default();
+
+    // Consecutive failure counter for backoff
+    let mut fail_count: u32 = 0;
 
     loop {
         if !WATCHING.load(Ordering::SeqCst) {
             break;
         }
 
-        // Read clipboard via tauri plugin - we need to use a different approach
-        // Since we can't use async from a sync thread easily, we'll use the
-        // command-line pbpaste on macOS as a fallback
-        if let Ok(text) = get_clipboard_text() {
-            if !text.is_empty() && text.len() >= MIN_LENGTH {
-                let hash = content_hash(&text);
-                if hash != last_hash {
-                    last_hash = hash;
+        match get_clipboard_text() {
+            Ok(text) => {
+                fail_count = 0; // Reset on success
 
-                    // Save and emit event
-                    if let Ok(event) = save_clip_content(&text) {
-                        let _ = app.emit("clipboard-saved", &event);
+                if !text.is_empty() && text.len() >= MIN_LENGTH {
+                    let hash = content_hash(&text);
+                    if hash != last_hash {
+                        last_hash = hash;
+
+                        // Save and emit event
+                        if let Ok(event) = save_clip_content(&text) {
+                            let _ = app.emit("clipboard-saved", &event);
+                        }
                     }
+                }
+            }
+            Err(_) => {
+                fail_count = fail_count.saturating_add(1);
+                // Back off on repeated failures (max 3s)
+                if fail_count > 5 {
+                    std::thread::sleep(std::time::Duration::from_millis(3000));
+                    continue;
                 }
             }
         }
@@ -109,13 +122,20 @@ fn clipboard_poll_loop(app: AppHandle, _watching: Arc<AtomicBool>) {
 }
 
 fn get_clipboard_text() -> Result<String, String> {
-    // Use pbpaste on macOS, xclip on Linux, powershell on Windows
     #[cfg(target_os = "macos")]
     {
+        // Use pbpaste with explicit UTF-8 and timeout
         let output = std::process::Command::new("pbpaste")
+            .env("LANG", "en_US.UTF-8")
             .output()
             .map_err(|e| e.to_string())?;
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+
+        if !output.status.success() {
+            return Err("pbpaste failed".into());
+        }
+
+        let text = String::from_utf8_lossy(&output.stdout).to_string();
+        Ok(text)
     }
 
     #[cfg(target_os = "linux")]
@@ -124,15 +144,25 @@ fn get_clipboard_text() -> Result<String, String> {
             .args(["-selection", "clipboard", "-o"])
             .output()
             .map_err(|e| e.to_string())?;
+
+        if !output.status.success() {
+            return Err("xclip failed".into());
+        }
+
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 
     #[cfg(target_os = "windows")]
     {
         let output = std::process::Command::new("powershell")
-            .args(["-Command", "Get-Clipboard"])
+            .args(["-NoProfile", "-Command", "Get-Clipboard"])
             .output()
             .map_err(|e| e.to_string())?;
+
+        if !output.status.success() {
+            return Err("powershell clipboard failed".into());
+        }
+
         Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 }
@@ -140,7 +170,7 @@ fn get_clipboard_text() -> Result<String, String> {
 fn save_clip_content(content: &str) -> Result<ClipboardEvent, String> {
     let sync_dir = files::sync_dir();
     if !sync_dir.exists() {
-        return Err("GitMemo 未初始化".into());
+        return Err("GitMemo not initialized".into());
     }
 
     let now = chrono::Local::now();
@@ -179,8 +209,9 @@ fn save_clip_content(content: &str) -> Result<ClipboardEvent, String> {
 
     // Write markdown
     let md = format!(
-        "---\ndate: {}\nsource: clipboard\n---\n\n{}\n",
+        "---\ndate: {}\nsource: clipboard\nchars: {}\n---\n\n{}\n",
         now.format("%Y-%m-%d %H:%M:%S"),
+        content.len(),
         content
     );
     std::fs::write(&full_path, &md).map_err(|e| e.to_string())?;

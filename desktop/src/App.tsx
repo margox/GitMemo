@@ -8,31 +8,43 @@ import SearchPage from "./pages/SearchPage";
 import DashboardPage from "./pages/DashboardPage";
 
 export type Page = "dashboard" | "notes" | "clipboard" | "search";
+export type Theme = "dark" | "light";
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>("dashboard");
   const [focusTrigger, setFocusTrigger] = useState(0);
+  const [theme, setTheme] = useState<Theme>(() => {
+    return (localStorage.getItem("gitmemo-theme") as Theme) || "dark";
+  });
 
   const navigateAndFocus = useCallback((page: Page) => {
     setCurrentPage(page);
     setFocusTrigger((n) => n + 1);
   }, []);
 
+  const toggleTheme = useCallback(() => {
+    setTheme((t) => {
+      const next = t === "dark" ? "light" : "dark";
+      localStorage.setItem("gitmemo-theme", next);
+      return next;
+    });
+  }, []);
+
+  // Apply theme to root element
   useEffect(() => {
-    // Global shortcut search event from Rust
+    document.documentElement.setAttribute("data-theme", theme);
+  }, [theme]);
+
+  useEffect(() => {
     const unlistenSearch = listen("global-shortcut-search", () => {
       navigateAndFocus("search");
     });
-
-    // Tray clipboard toggle
     const unlistenClip = listen("tray-toggle-clipboard", () => {
       setCurrentPage("clipboard");
     });
 
-    // App-level keyboard shortcuts
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
-
       if (e.metaKey || e.ctrlKey) {
         switch (e.key) {
           case "1": e.preventDefault(); setCurrentPage("dashboard"); break;
@@ -55,7 +67,7 @@ function App() {
 
   return (
     <div className="flex h-screen w-screen">
-      <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} />
+      <Sidebar currentPage={currentPage} onNavigate={setCurrentPage} theme={theme} onToggleTheme={toggleTheme} />
       <main className="flex-1 overflow-hidden">
         {currentPage === "dashboard" && <DashboardPage />}
         {currentPage === "notes" && <NotesPage focusTrigger={focusTrigger} />}
