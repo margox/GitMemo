@@ -119,7 +119,7 @@ export default function Sidebar({ currentPage, onNavigate, theme, onToggleTheme 
         })}
       </nav>
 
-      {/* Sync button */}
+      {/* Sync button + version */}
       <div style={{ padding: 12, borderTop: "1px solid var(--border)" }}>
         <button
           onClick={handleSync}
@@ -139,7 +139,7 @@ export default function Sidebar({ currentPage, onNavigate, theme, onToggleTheme 
             cursor: syncing ? "default" : "pointer",
           }}
         >
-          <RefreshCw size={13} className={syncing ? "animate-spin" : ""} />
+          <RefreshCw size={13} style={syncing ? { animation: "spin 1s linear infinite" } : undefined} />
           {syncing ? "Syncing..." : "Sync to Git"}
         </button>
         {syncMsg && (
@@ -147,6 +147,9 @@ export default function Sidebar({ currentPage, onNavigate, theme, onToggleTheme 
             {syncMsg}
           </p>
         )}
+        <p style={{ fontSize: 10, textAlign: "center", marginTop: 8, color: "var(--text-secondary)", opacity: 0.6 }}>
+          GitMemo Desktop v0.2.0
+        </p>
       </div>
     </div>
   );

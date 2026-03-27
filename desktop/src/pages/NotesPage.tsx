@@ -163,9 +163,11 @@ export default function NotesPage({ focusTrigger }: { focusTrigger?: number }) {
                 ref={textareaRef}
                 value={newNote}
                 onChange={(e) => setNewNote(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) handleCreateNote(); }}
-                placeholder={activeTab === "daily" ? "Add to today's note..." : "Quick note..."}
-                rows={3}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleCreateNote(); }
+                }}
+                placeholder={activeTab === "daily" ? "Add to today's note... (Shift+Enter for newline)" : "Quick note... (Shift+Enter for newline)"}
+                rows={2}
                 style={{
                   width: "100%", padding: "10px 12px", borderRadius: 8, fontSize: 13,
                   resize: "none", background: "var(--bg)", color: "var(--text)",
@@ -186,7 +188,7 @@ export default function NotesPage({ focusTrigger }: { focusTrigger?: number }) {
               </button>
             </div>
             <p style={{ fontSize: 10, marginTop: 6, color: "var(--text-secondary)" }}>
-              Cmd+Enter to save
+              Enter to save, Shift+Enter for newline
             </p>
           </div>
         )}

@@ -183,3 +183,9 @@ textarea:focus, input:focus {
 .markdown-body input[type="checkbox"] {
   margin-right: 6px;
 }
+
+/* Spin animation for sync icon */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
