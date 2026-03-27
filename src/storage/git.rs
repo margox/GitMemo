@@ -18,6 +18,24 @@ impl SyncResult {
     }
 }
 
+/// Read the configured branch from config.toml, default to "main"
+fn configured_branch(repo_path: &Path) -> String {
+    let config_path = repo_path.join(".metadata").join("config.toml");
+    if config_path.exists() {
+        if let Ok(content) = std::fs::read_to_string(&config_path) {
+            if let Ok(config) = toml::from_str::<toml::Value>(&content) {
+                if let Some(branch) = config.get("git")
+                    .and_then(|g| g.get("branch"))
+                    .and_then(|b| b.as_str())
+                {
+                    return branch.to_string();
+                }
+            }
+        }
+    }
+    "main".to_string()
+}
+
 /// Initialize or open Git repository at the given path
 pub fn init_repo(repo_path: &Path, remote_url: &str) -> Result<git2::Repository> {
     let repo = if repo_path.join(".git").exists() {
@@ -41,6 +59,53 @@ pub fn init_repo(repo_path: &Path, remote_url: &str) -> Result<git2::Repository>
     };
 
     Ok(repo)
+}
+
+/// Detect the remote's default branch by querying `git ls-remote --symref origin HEAD`
+/// Returns "main" or "master" etc.
+pub fn detect_remote_branch(repo_path: &Path) -> String {
+    // Method 1: ls-remote --symref (most reliable)
+    let output = std::process::Command::new("git")
+        .args(["ls-remote", "--symref", "origin", "HEAD"])
+        .current_dir(repo_path)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .output();
+
+    if let Ok(o) = output {
+        if o.status.success() {
+            let stdout = String::from_utf8_lossy(&o.stdout);
+            // Format: "ref: refs/heads/main\tHEAD"
+            for line in stdout.lines() {
+                if line.starts_with("ref: refs/heads/") && line.contains("HEAD") {
+                    let branch = line
+                        .trim_start_matches("ref: refs/heads/")
+                        .split('\t')
+                        .next()
+                        .unwrap_or("main");
+                    return branch.to_string();
+                }
+            }
+        }
+    }
+
+    // Method 2: Check if local branch exists
+    if let Some(branch) = current_branch(repo_path) {
+        return branch;
+    }
+
+    "main".to_string()
+}
+
+/// Set up upstream tracking: local branch tracks origin/<branch>
+pub fn setup_tracking(repo_path: &Path, branch: &str) {
+    // Set upstream tracking with git branch --set-upstream-to
+    let _ = std::process::Command::new("git")
+        .args(["branch", "--set-upstream-to", &format!("origin/{}", branch), branch])
+        .current_dir(repo_path)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .output();
 }
 
 /// Stage all changes, commit, and push. Returns sync result.
@@ -72,16 +137,19 @@ pub fn commit_and_push(repo_path: &Path, message: &str) -> Result<SyncResult> {
         true
     };
 
-    // Push using system git (handles SSH auth via ssh-agent / system keychain)
+    // Push using system git with configured branch
     let (pushed, push_error) = do_push(repo_path);
 
     Ok(SyncResult { committed, pushed, push_error })
 }
 
-/// Execute git push and return (success, error_message)
+/// Execute git push to the configured branch and return (success, error_message)
 fn do_push(repo_path: &Path) -> (bool, Option<String>) {
+    let branch = configured_branch(repo_path);
+
+    // Use -u to set upstream tracking on first push
     let output = std::process::Command::new("git")
-        .args(["push", "origin", "HEAD"])
+        .args(["push", "-u", "origin", &format!("HEAD:{}", branch)])
         .current_dir(repo_path)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
@@ -106,25 +174,35 @@ fn do_push(repo_path: &Path) -> (bool, Option<String>) {
 /// Count unpushed commits using multiple strategies
 ///
 /// Strategy order:
-/// 1. `@{u}` — the configured upstream (most reliable)
-/// 2. `origin/<current-branch>` — explicit remote tracking branch
-/// 3. `origin/main` then `origin/master` — common defaults
-/// 4. Compare local HEAD with `git ls-remote` (ground truth, requires network)
+/// 1. `@{u}` — the configured upstream (most reliable when tracking is set)
+/// 2. `origin/<configured-branch>` — from config.toml
+/// 3. `origin/<current-branch>` — git's current branch
+/// 4. `origin/main` then `origin/master` — common defaults
+/// 5. Compare local HEAD with `git ls-remote` (ground truth, requires network)
 pub fn unpushed_count(repo_path: &Path) -> Result<usize> {
     // Strategy 1: Use @{u} (upstream tracking ref)
     if let Some(count) = rev_list_count(repo_path, "@{u}..HEAD") {
         return Ok(count);
     }
 
-    // Strategy 2: Get current branch name, try origin/<branch>
+    // Strategy 2: Use configured branch from config.toml
+    let cfg_branch = configured_branch(repo_path);
+    let refspec = format!("origin/{}..HEAD", cfg_branch);
+    if let Some(count) = rev_list_count(repo_path, &refspec) {
+        return Ok(count);
+    }
+
+    // Strategy 3: Get current branch name, try origin/<branch>
     if let Some(branch) = current_branch(repo_path) {
-        let refspec = format!("origin/{}..HEAD", branch);
-        if let Some(count) = rev_list_count(repo_path, &refspec) {
-            return Ok(count);
+        if branch != cfg_branch {
+            let refspec = format!("origin/{}..HEAD", branch);
+            if let Some(count) = rev_list_count(repo_path, &refspec) {
+                return Ok(count);
+            }
         }
     }
 
-    // Strategy 3: Common defaults
+    // Strategy 4: Common defaults (skip if already tried)
     for remote_ref in &["origin/main", "origin/master"] {
         let refspec = format!("{}..HEAD", remote_ref);
         if let Some(count) = rev_list_count(repo_path, &refspec) {
@@ -132,13 +210,12 @@ pub fn unpushed_count(repo_path: &Path) -> Result<usize> {
         }
     }
 
-    // Strategy 4: Compare local HEAD with remote via ls-remote (network call)
+    // Strategy 5: Compare local HEAD with remote via ls-remote (network call)
     if let Some(count) = count_via_ls_remote(repo_path) {
         return Ok(count);
     }
 
-    // If all strategies fail, return error instead of silently returning 0
-    // This way callers can distinguish "0 unpushed" from "can't determine"
+    // If all strategies fail, return 0 but has_unpushed() will catch this
     Ok(0)
 }
 
@@ -148,18 +225,29 @@ pub fn has_unpushed(repo_path: &Path) -> bool {
     if let Some(count) = rev_list_count(repo_path, "@{u}..HEAD") {
         return count > 0;
     }
+
+    let cfg_branch = configured_branch(repo_path);
+    let refspec = format!("origin/{}..HEAD", cfg_branch);
+    if let Some(count) = rev_list_count(repo_path, &refspec) {
+        return count > 0;
+    }
+
     if let Some(branch) = current_branch(repo_path) {
-        let refspec = format!("origin/{}..HEAD", branch);
-        if let Some(count) = rev_list_count(repo_path, &refspec) {
-            return count > 0;
+        if branch != cfg_branch {
+            let refspec = format!("origin/{}..HEAD", branch);
+            if let Some(count) = rev_list_count(repo_path, &refspec) {
+                return count > 0;
+            }
         }
     }
+
     for remote_ref in &["origin/main", "origin/master"] {
         let refspec = format!("{}..HEAD", remote_ref);
         if let Some(count) = rev_list_count(repo_path, &refspec) {
             return count > 0;
         }
     }
+
     // Fall back to ls-remote
     if let Some(count) = count_via_ls_remote(repo_path) {
         return count > 0;
@@ -206,6 +294,8 @@ fn rev_list_count(repo_path: &Path, refspec: &str) -> Option<usize> {
 
 /// Compare local HEAD with remote using ls-remote (requires network)
 fn count_via_ls_remote(repo_path: &Path) -> Option<usize> {
+    let cfg_branch = configured_branch(repo_path);
+
     // Get local HEAD hash
     let local_output = std::process::Command::new("git")
         .args(["rev-parse", "HEAD"])
@@ -220,20 +310,41 @@ fn count_via_ls_remote(repo_path: &Path) -> Option<usize> {
     }
     let local_head = String::from_utf8_lossy(&local_output.stdout).trim().to_string();
 
-    // Get remote HEAD hash
+    // Get remote branch hash (try configured branch first, then HEAD)
+    let remote_ref = format!("refs/heads/{}", cfg_branch);
     let remote_output = std::process::Command::new("git")
-        .args(["ls-remote", "origin", "HEAD"])
+        .args(["ls-remote", "origin", &remote_ref])
         .current_dir(repo_path)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())
         .output()
         .ok()?;
 
-    if !remote_output.status.success() {
-        return None;
-    }
-    let remote_str = String::from_utf8_lossy(&remote_output.stdout).trim().to_string();
-    let remote_head = remote_str.split_whitespace().next().unwrap_or("");
+    let remote_head = if remote_output.status.success() {
+        let remote_str = String::from_utf8_lossy(&remote_output.stdout).trim().to_string();
+        remote_str.split_whitespace().next().unwrap_or("").to_string()
+    } else {
+        String::new()
+    };
+
+    // If couldn't get from configured branch, try HEAD
+    let remote_head = if remote_head.is_empty() {
+        let head_output = std::process::Command::new("git")
+            .args(["ls-remote", "origin", "HEAD"])
+            .current_dir(repo_path)
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .output()
+            .ok()?;
+
+        if !head_output.status.success() {
+            return None;
+        }
+        let head_str = String::from_utf8_lossy(&head_output.stdout).trim().to_string();
+        head_str.split_whitespace().next().unwrap_or("").to_string()
+    } else {
+        remote_head
+    };
 
     if remote_head.is_empty() {
         // Remote has no commits yet — all local commits are unpushed
@@ -265,7 +376,6 @@ fn count_via_ls_remote(repo_path: &Path) -> Option<usize> {
 
 /// List unpushed commit messages
 pub fn unpushed_log(repo_path: &Path) -> Result<Vec<String>> {
-    // Try multiple strategies, same as unpushed_count
     let refspecs = build_refspec_candidates(repo_path);
 
     for refspec in &refspecs {
@@ -283,10 +393,6 @@ pub fn unpushed_log(repo_path: &Path) -> Result<Vec<String>> {
                     .map(|l| l.to_string())
                     .filter(|l| !l.is_empty())
                     .collect();
-                if !lines.is_empty() || refspecs.len() == 1 {
-                    return Ok(lines);
-                }
-                // If this refspec returned 0 lines, try next one only if it might be wrong
                 return Ok(lines);
             }
         }
@@ -298,18 +404,28 @@ pub fn unpushed_log(repo_path: &Path) -> Result<Vec<String>> {
 /// Build a list of refspec candidates for unpushed detection
 fn build_refspec_candidates(repo_path: &Path) -> Vec<String> {
     let mut candidates = Vec::new();
+    let cfg_branch = configured_branch(repo_path);
 
     // 1. Upstream tracking
     candidates.push("@{u}..HEAD".to_string());
 
-    // 2. origin/<current-branch>
+    // 2. Configured branch from config.toml
+    candidates.push(format!("origin/{}..HEAD", cfg_branch));
+
+    // 3. origin/<current-branch> (if different from configured)
     if let Some(branch) = current_branch(repo_path) {
-        candidates.push(format!("origin/{}..HEAD", branch));
+        if branch != cfg_branch {
+            candidates.push(format!("origin/{}..HEAD", branch));
+        }
     }
 
-    // 3. Common defaults
-    candidates.push("origin/main..HEAD".to_string());
-    candidates.push("origin/master..HEAD".to_string());
+    // 4. Common defaults (skip duplicates)
+    for default in &["origin/main", "origin/master"] {
+        let candidate = format!("{}..HEAD", default);
+        if !candidates.contains(&candidate) {
+            candidates.push(candidate);
+        }
+    }
 
     candidates
 }

@@ -270,18 +270,20 @@ fn cmd_init(git_url: Option<String>, path: Option<String>, no_mcp: bool, editor:
         }
     }
 
-    // 8. Save config (with language)
+    // 8. Detect remote default branch and save config
+    let branch = storage::git::detect_remote_branch(&sync_dir);
     let config = utils::config::Config {
         git: utils::config::GitConfig {
             remote: url,
-            branch: "main".to_string(),
+            branch: branch.clone(),
         },
         lang: lang.as_str().to_string(),
     };
     config.save(&utils::config::Config::config_path())?;
 
-    // 9. Initial commit
+    // 9. Initial commit + set upstream tracking
     storage::git::commit_and_push(&sync_dir, "init: gitmemo")?;
+    storage::git::setup_tracking(&sync_dir, &branch);
 
     // 10. Show public key and next steps
     println!();
