@@ -8,7 +8,7 @@ pub enum Lang {
 }
 
 impl Lang {
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "zh" | "zh-cn" | "chinese" => Lang::Zh,
             _ => Lang::En,
@@ -41,7 +41,7 @@ pub fn init_from_config() {
     let config_path = crate::utils::config::Config::config_path();
     if config_path.exists() {
         if let Ok(config) = crate::utils::config::Config::load(&config_path) {
-            let lang = Lang::from_str(&config.lang);
+            let lang = Lang::parse(&config.lang);
             init(lang);
             return;
         }

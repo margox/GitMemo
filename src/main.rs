@@ -89,7 +89,7 @@ fn cmd_init(git_url: Option<String>, path: Option<String>, no_mcp: bool, editor:
 
     // 0a. Determine language (ask first, before anything else)
     let lang = match lang_arg.as_deref() {
-        Some(l) => Lang::from_str(l),
+        Some(l) => Lang::parse(l),
         None => {
             let lang_options = vec!["English", "中文"];
             let selection = Select::new()
