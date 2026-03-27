@@ -27,7 +27,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
     outputs:
-      version: ${{ steps.version.outputs.version }}
+      version: ${{ steps.check.outputs.version || steps.version.outputs.version }}
       should_release: ${{ steps.check.outputs.should_release }}
     steps:
       - uses: actions/checkout@v4
@@ -40,11 +40,36 @@ jobs:
           VERSION=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
           echo "version=v${VERSION}" >> $GITHUB_OUTPUT
 
-      - name: Check if tag exists
+      - name: Check if tag exists and auto-bump if needed
         id: check
         run: |
-          if git rev-parse "${{ steps.version.outputs.version }}" >/dev/null 2>&1; then
-            echo "should_release=false" >> $GITHUB_OUTPUT
+          TAG="${{ steps.version.outputs.version }}"
+          if git rev-parse "$TAG" >/dev/null 2>&1; then
+            # Tag exists — check if there are new commits since the tag
+            COMMITS_SINCE=$(git rev-list "$TAG"..HEAD --count)
+            if [ "$COMMITS_SINCE" -gt 0 ]; then
+              echo "Tag $TAG exists but $COMMITS_SINCE new commits found. Auto-bumping version..."
+              # Bump patch version in Cargo.toml
+              CURRENT=$(grep '^version' Cargo.toml | head -1 | sed 's/.*"\(.*\)".*/\1/')
+              MAJOR=$(echo "$CURRENT" | cut -d. -f1)
+              MINOR=$(echo "$CURRENT" | cut -d. -f2)
+              PATCH=$(echo "$CURRENT" | cut -d. -f3)
+              NEW_PATCH=$((PATCH + 1))
+              NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+              sed -i "s/^version = \"${CURRENT}\"/version = \"${NEW_VERSION}\"/" Cargo.toml
+              # Commit and push the version bump
+              git config user.name "github-actions[bot]"
+              git config user.email "github-actions[bot]@users.noreply.github.com"
+              git add Cargo.toml
+              git commit -m "chore: auto-bump version to ${NEW_VERSION} [skip ci]"
+              git push origin HEAD:main
+              # Update output with new version
+              echo "version=v${NEW_VERSION}" >> $GITHUB_OUTPUT
+              echo "should_release=true" >> $GITHUB_OUTPUT
+            else
+              echo "Tag $TAG exists and no new commits. Skipping release."
+              echo "should_release=false" >> $GITHUB_OUTPUT
+            fi
           else
             echo "should_release=true" >> $GITHUB_OUTPUT
           fi
@@ -70,6 +95,8 @@ jobs:
             artifact: gitmemo-macos-x86_64
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - uses: dtolnay/rust-toolchain@stable
         with:
@@ -104,6 +131,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4

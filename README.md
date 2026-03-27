@@ -10,8 +10,9 @@ GitMemo automatically records your conversations with Claude or Cursor (or any A
 
 - **Auto-record** — Conversations saved as Markdown, completely transparent
 - **Multi-editor** — Supports both Claude Code and Cursor
+- **i18n** — English and Chinese interface, selectable during `gitmemo init`
 - **Notes** — Scratch notes, daily journal, manuals — one command to create
-- **Git sync** — Auto commit & push, version control, cross-device access
+- **Git sync** — Auto commit & push, branch management, cross-device access
 - **MCP integration** — Search history and create notes directly from your AI editor
 - **Zero daemon** — No background process, powered by native editor hooks
 - **Data ownership** — Your data stays in YOUR Git repo
@@ -89,6 +90,10 @@ gitmemo init --editor claude    # Claude Code only
 gitmemo init --editor cursor    # Cursor only
 gitmemo init --editor all       # Both
 
+# Specify language (default: English)
+gitmemo init --lang zh          # Chinese interface
+gitmemo init --lang en          # English interface
+
 # Link to an existing local Git repo
 gitmemo init --path /path/to/your/repo
 ```
@@ -119,13 +124,17 @@ If you see the note file and git commit, it's working.
 
 ```
 gitmemo init               # Initialize configuration
-gitmemo status             # Show status
+gitmemo status             # Show config and sync status
+gitmemo sync               # Sync local changes to Git (commit + push)
+gitmemo branch             # Show current sync branch
+gitmemo branch main        # Switch sync branch to "main"
 gitmemo note "quick note"  # Create a scratch note
 gitmemo daily              # Open/append daily journal
 gitmemo manual "Title"     # Create a manual
 gitmemo search "docker"    # Full-text search conversations and notes
 gitmemo recent             # List recent conversations
 gitmemo stats              # Show statistics
+gitmemo unpushed           # Show unpushed commits
 gitmemo reindex            # Rebuild search index
 gitmemo uninstall          # Remove configs (keeps data)
 ```
