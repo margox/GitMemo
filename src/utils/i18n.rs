@@ -631,6 +631,29 @@ impl I18n {
         }
     }
 
+    // ── Branch command ───────────────────────────────────────
+
+    pub fn branch_current(&self, branch: &str) -> String {
+        match self.lang {
+            Lang::En => format!("Current sync branch: {}", branch),
+            Lang::Zh => format!("当前同步分支: {}", branch),
+        }
+    }
+
+    pub fn branch_switched(&self, from: &str, to: &str) -> String {
+        match self.lang {
+            Lang::En => format!("Sync branch changed: {} → {}", from, to),
+            Lang::Zh => format!("同步分支已切换: {} → {}", from, to),
+        }
+    }
+
+    pub fn branch_same(&self, branch: &str) -> String {
+        match self.lang {
+            Lang::En => format!("Already on branch {}", branch),
+            Lang::Zh => format!("已经在 {} 分支上", branch),
+        }
+    }
+
     // ── Global errors ────────────────────────────────────────
 
     pub fn not_init_error(&self) -> &str {

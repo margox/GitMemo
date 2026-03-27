@@ -111,4 +111,10 @@ pub enum Commands {
 
     /// Show unpushed commits
     Unpushed,
+
+    /// Show or set the sync branch (e.g. `gitmemo branch main`)
+    Branch {
+        /// Branch name to set. Omit to show current branch.
+        name: Option<String>,
+    },
 }

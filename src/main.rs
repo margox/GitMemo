@@ -65,6 +65,9 @@ fn main() -> Result<()> {
         Commands::Unpushed => {
             cmd_unpushed()?;
         }
+        Commands::Branch { name } => {
+            cmd_branch(name)?;
+        }
     }
 
     Ok(())
@@ -769,6 +772,44 @@ fn cmd_reindex() -> Result<()> {
         style("✓").green(),
         t.index_rebuilt(count as usize)
     );
+
+    Ok(())
+}
+
+fn cmd_branch(name: Option<String>) -> Result<()> {
+    use console::style;
+    let t = utils::i18n::get();
+    let sync_dir = ensure_init()?;
+
+    let config_path = utils::config::Config::config_path();
+    let mut config = utils::config::Config::load(&config_path)?;
+
+    match name {
+        None => {
+            // Show current branch
+            println!("  {}", t.branch_current(&config.git.branch));
+        }
+        Some(new_branch) => {
+            let old_branch = config.git.branch.clone();
+            if old_branch == new_branch {
+                println!("  {} {}", style("ℹ").blue(), t.branch_same(&new_branch));
+                return Ok(());
+            }
+
+            // Update config
+            config.git.branch = new_branch.clone();
+            config.save(&config_path)?;
+
+            // Update git upstream tracking
+            storage::git::setup_tracking(&sync_dir, &new_branch);
+
+            println!(
+                "  {} {}",
+                style("✓").green(),
+                t.branch_switched(&old_branch, &new_branch)
+            );
+        }
+    }
 
     Ok(())
 }
