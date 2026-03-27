@@ -98,7 +98,21 @@ pub fn detect_remote_branch(repo_path: &Path) -> String {
 }
 
 /// Set up upstream tracking: local branch tracks origin/<branch>
+/// Also renames local branch to match if they differ.
 pub fn setup_tracking(repo_path: &Path, branch: &str) {
+    // First: ensure local branch name matches the target branch
+    if let Some(current) = current_branch(repo_path) {
+        if current != branch {
+            // Rename local branch: current → target
+            let _ = std::process::Command::new("git")
+                .args(["branch", "-m", &current, branch])
+                .current_dir(repo_path)
+                .stdout(std::process::Stdio::piped())
+                .stderr(std::process::Stdio::piped())
+                .output();
+        }
+    }
+
     // Set upstream tracking with git branch --set-upstream-to
     let _ = std::process::Command::new("git")
         .args(["branch", "--set-upstream-to", &format!("origin/{}", branch), branch])
