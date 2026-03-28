@@ -10,8 +10,9 @@ GitMemo 自动将你与 Claude 或 Cursor（或任何 AI Agent）的对话记录
 
 - **自动记录** — 对话自动保存为 Markdown，完全透明
 - **多编辑器** — 同时支持 Claude Code 和 Cursor
+- **多语言** — 支持中英文界面，`gitmemo init` 时可选择
 - **笔记功能** — 便签、每日笔记、手册，一行命令创建
-- **Git 同步** — 自动 commit & push，版本控制、跨设备访问
+- **Git 同步** — 自动 commit & push，分支管理、跨设备访问
 - **MCP 集成** — 在 AI 编辑器中直接搜索历史对话、创建笔记
 - **零进程** — 不启动后台服务，利用编辑器原生 hooks 驱动
 - **数据主权** — 数据存储在你自己的 Git 仓库，完全可控
@@ -89,6 +90,10 @@ gitmemo init --editor claude    # 仅 Claude Code
 gitmemo init --editor cursor    # 仅 Cursor
 gitmemo init --editor all       # 两者都装
 
+# 指定语言（默认英文）
+gitmemo init --lang zh          # 中文界面
+gitmemo init --lang en          # 英文界面
+
 # 链接到已有的本地 Git 仓库
 gitmemo init --path /path/to/your/repo
 ```
@@ -119,13 +124,17 @@ gitmemo status
 
 ```
 gitmemo init               # 初始化配置
-gitmemo status             # 查看状态
+gitmemo status             # 查看配置与同步状态
+gitmemo sync               # 同步本地更改到 Git（commit + push）
+gitmemo branch             # 查看当前同步分支
+gitmemo branch main        # 切换同步分支为 "main"
 gitmemo note "记个笔记"     # 创建便签
 gitmemo daily              # 今日笔记
 gitmemo manual "标题"       # 创建手册
 gitmemo search "docker"    # 全文搜索对话和笔记
 gitmemo recent             # 最近的对话
 gitmemo stats              # 统计信息
+gitmemo unpushed           # 查看未推送的提交
 gitmemo reindex            # 重建搜索索引
 gitmemo uninstall          # 移除配置（保留数据）
 ```
