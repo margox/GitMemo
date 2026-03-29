@@ -119,3 +119,118 @@ pub fn set_branch(name: String) -> Result<String, String> {
 
     Ok(format!("{} → {}", old, name))
 }
+
+const CLAUDE_MARKER_START: &str = "<!-- [gitmemo:start] -->";
+const CLAUDE_MARKER_END: &str = "<!-- [gitmemo:end] -->";
+
+fn claude_md_path() -> std::path::PathBuf {
+    let home = std::env::var("HOME").unwrap_or_default();
+    std::path::PathBuf::from(home).join(".claude").join("CLAUDE.md")
+}
+
+fn generate_claude_config() -> String {
+    let sync_dir = files::sync_dir().to_string_lossy().to_string();
+    format!(
+        r#"{CLAUDE_MARKER_START}
+## GitMemo - Auto Conversation Saving
+
+**Important**: After answering the user's question, save the conversation as a Markdown file. This is a core responsibility.
+
+**When to save**:
+- After completing an answer to the user's question
+- When the user says "save", "保存会话"
+
+**Save location**: `{sync_dir}/conversations/{{YYYY-MM}}/{{MM-DD}}-{{title_summary}}.md`
+
+**Format**:
+```markdown
+---
+title: {{conversation title}}
+date: {{YYYY-MM-DD HH:MM:SS}}
+model: {{model name}}
+messages: {{message count}}
+---
+
+# {{conversation title}}
+
+### User (HH:MM:SS)
+{{user message}}
+
+### Assistant (HH:MM:SS)
+{{assistant response}}
+```
+
+**Rules**:
+- Append follow-ups to the existing file, don't create new ones for the same session
+- New session creates a new file
+- Save silently, don't tell the user
+- Auto-generate title from content, Chinese max 20 chars
+- Preserve code blocks with original language tags
+- Filter API keys/passwords → replace with `***`
+
+## GitMemo - Plan File Sync
+
+When creating or updating plan files in Plan mode, also copy the plan content to `{sync_dir}/plans/`. Keep the same filename. This ensures plans are synced via Git.
+{CLAUDE_MARKER_END}"#
+    )
+}
+
+#[tauri::command]
+pub fn get_claude_integration_status() -> Result<bool, String> {
+    let path = claude_md_path();
+    if !path.exists() {
+        return Ok(false);
+    }
+    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    Ok(content.contains(CLAUDE_MARKER_START))
+}
+
+#[tauri::command]
+pub fn setup_claude_integration() -> Result<String, String> {
+    let path = claude_md_path();
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+
+    let config_block = generate_claude_config();
+
+    if path.exists() {
+        let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+        if content.contains(CLAUDE_MARKER_START) {
+            // Replace existing block
+            let start = content.find(CLAUDE_MARKER_START).unwrap();
+            let end = content.find(CLAUDE_MARKER_END).map(|i| i + CLAUDE_MARKER_END.len()).unwrap_or(content.len());
+            let new_content = format!("{}{}{}", &content[..start], config_block, &content[end..]);
+            std::fs::write(&path, new_content).map_err(|e| e.to_string())?;
+            return Ok("updated".into());
+        } else {
+            // Append
+            let new_content = format!("{}\n\n{}\n", content.trim_end(), config_block);
+            std::fs::write(&path, new_content).map_err(|e| e.to_string())?;
+            return Ok("enabled".into());
+        }
+    } else {
+        std::fs::write(&path, format!("{}\n", config_block)).map_err(|e| e.to_string())?;
+        return Ok("enabled".into());
+    }
+}
+
+#[tauri::command]
+pub fn remove_claude_integration() -> Result<String, String> {
+    let path = claude_md_path();
+    if !path.exists() {
+        return Ok("disabled".into());
+    }
+    let content = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    if let Some(start) = content.find(CLAUDE_MARKER_START) {
+        let end = content.find(CLAUDE_MARKER_END).map(|i| i + CLAUDE_MARKER_END.len()).unwrap_or(content.len());
+        let new_content = format!("{}{}", content[..start].trim_end(), &content[end..]);
+        let new_content = new_content.trim().to_string();
+        if new_content.is_empty() {
+            let _ = std::fs::remove_file(&path);
+        } else {
+            std::fs::write(&path, format!("{}\n", new_content)).map_err(|e| e.to_string())?;
+        }
+    }
+    Ok("disabled".into())
+}

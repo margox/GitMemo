@@ -52,6 +52,9 @@ pub fn run() {
             settings::set_clipboard_autostart,
             settings::get_branch,
             settings::set_branch,
+            settings::get_claude_integration_status,
+            settings::setup_claude_integration,
+            settings::remove_claude_integration,
         ])
         .setup(|app| {
             // Store app handle for background git sync events

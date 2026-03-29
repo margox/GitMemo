@@ -105,6 +105,10 @@
     "remoteRepo": "远程仓库",
     "remoteRepoDesc": "用于同步的 Git 远程地址",
     "noRemote": "未配置",
+    "claudeIntegration": "Claude Code 集成",
+    "claudeIntegrationDesc": "自动保存对话记录 & 同步计划文件",
+    "claudeEnabled": "已启用",
+    "claudeEnable": "启用",
     "dark": "深色",
     "light": "浅色"
   },

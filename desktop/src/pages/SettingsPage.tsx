@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Settings, Power, Clipboard, Sun, Moon, GitBranch, ExternalLink, Globe, FolderOpen, Globe2 } from "lucide-react";
+import { Settings, Power, Clipboard, Sun, Moon, GitBranch, ExternalLink, Globe, FolderOpen, Globe2, Terminal } from "lucide-react";
 import type { Theme } from "../App";
 import { useI18n, type Locale } from "../hooks/useI18n";
 import { useToast } from "../hooks/useToast";
@@ -56,6 +56,7 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
   const [editingBranch, setEditingBranch] = useState(false);
   const [syncDir, setSyncDir] = useState("");
   const [gitRemote, setGitRemote] = useState("");
+  const [claudeEnabled, setClaudeEnabled] = useState(false);
 
   useEffect(() => {
     invoke<DesktopSettings>("get_settings").then(setSettings).catch(console.error);
@@ -64,6 +65,7 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
       setSyncDir(s.sync_dir);
       setGitRemote(s.git_remote);
     }).catch(console.error);
+    invoke<boolean>("get_claude_integration_status").then(setClaudeEnabled).catch(console.error);
   }, []);
 
   const toggleAutostart = async () => {
@@ -80,6 +82,22 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
       await invoke<string>("set_clipboard_autostart", { enabled: !settings.clipboard_autostart });
       setSettings({ ...settings, clipboard_autostart: !settings.clipboard_autostart });
     } catch (e) { console.error(e); }
+  };
+
+  const toggleClaudeIntegration = async () => {
+    try {
+      if (claudeEnabled) {
+        await invoke<string>("remove_claude_integration");
+        setClaudeEnabled(false);
+        showToast("Claude integration disabled");
+      } else {
+        await invoke<string>("setup_claude_integration");
+        setClaudeEnabled(true);
+        showToast("Claude integration enabled");
+      }
+    } catch (e) {
+      showToast(`Error: ${e}`, true);
+    }
   };
 
   const saveBranch = async () => {
@@ -199,6 +217,20 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
               </div>
             </div>
             <Toggle enabled={settings?.clipboard_autostart ?? false} onToggle={toggleClipboardAutostart} />
+          </div>
+
+          <div style={{ borderTop: "1px solid var(--border)" }} />
+
+          {/* Claude integration */}
+          <div style={rowStyle}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Terminal size={15} style={{ color: "var(--text-secondary)" }} />
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 500 }}>{t("settings.claudeIntegration")}</p>
+                <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>{t("settings.claudeIntegrationDesc")}</p>
+              </div>
+            </div>
+            <Toggle enabled={claudeEnabled} onToggle={toggleClaudeIntegration} />
           </div>
 
           <div style={{ borderTop: "1px solid var(--border)" }} />

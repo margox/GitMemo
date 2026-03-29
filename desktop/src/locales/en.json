@@ -105,6 +105,10 @@
     "remoteRepo": "Remote repository",
     "remoteRepoDesc": "Git remote for syncing",
     "noRemote": "Not configured",
+    "claudeIntegration": "Claude Code integration",
+    "claudeIntegrationDesc": "Auto-save conversations & sync plans via CLAUDE.md",
+    "claudeEnabled": "Enabled",
+    "claudeEnable": "Enable",
     "dark": "dark",
     "light": "light"
   },
