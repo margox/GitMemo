@@ -8,9 +8,10 @@ import SearchPage from "./pages/SearchPage";
 import DashboardPage from "./pages/DashboardPage";
 import SettingsPage from "./pages/SettingsPage";
 import ConversationsPage from "./pages/ConversationsPage";
+import PlansPage from "./pages/PlansPage";
 import { useSync } from "./hooks/useSync";
 
-export type Page = "dashboard" | "conversations" | "notes" | "clipboard" | "search" | "settings";
+export type Page = "dashboard" | "conversations" | "notes" | "clipboard" | "search" | "plans" | "settings";
 export type Theme = "dark" | "light";
 
 function App() {
@@ -67,7 +68,8 @@ function App() {
           case "3": e.preventDefault(); setCurrentPage("conversations"); setSidebarFocused(false); break;
           case "4": e.preventDefault(); setCurrentPage("notes"); setSidebarFocused(false); break;
           case "5": e.preventDefault(); setCurrentPage("clipboard"); setSidebarFocused(false); break;
-          case "6": e.preventDefault(); setCurrentPage("settings"); setSidebarFocused(false); break;
+          case "6": e.preventDefault(); setCurrentPage("plans"); setSidebarFocused(false); break;
+          case "7": e.preventDefault(); setCurrentPage("settings"); setSidebarFocused(false); break;
           case "n": e.preventDefault(); navigateAndFocus("notes"); setSidebarFocused(false); break;
           case "k": e.preventDefault(); navigateAndFocus("search"); setSidebarFocused(false); break;
         }
@@ -98,6 +100,7 @@ function App() {
         {currentPage === "conversations" && <ConversationsPage sidebarFocused={sidebarFocused} onFocusSidebar={() => setSidebarFocused(true)} />}
         {currentPage === "notes" && <NotesPage focusTrigger={focusTrigger} />}
         {currentPage === "clipboard" && <ClipboardPage />}
+        {currentPage === "plans" && <PlansPage />}
         {currentPage === "search" && <SearchPage focusTrigger={focusTrigger} />}
         {currentPage === "settings" && <SettingsPage theme={theme} onToggleTheme={toggleTheme} />}
       </main>

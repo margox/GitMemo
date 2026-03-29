@@ -129,19 +129,8 @@ export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page
         })}
       </div>
 
-      {/* Git Info — 3 cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12 }}>
-        {/* Branch */}
-        <div style={cardStyle}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <GitBranch size={13} style={{ color: "var(--text-secondary)" }} />
-            <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>{t("dashboard.branch")}</span>
-          </div>
-          <p style={{ fontSize: 18, fontWeight: 700, color: "var(--accent)" }}>
-            {status.git_branch || "main"}
-          </p>
-        </div>
-
+      {/* Git Info — 2 cards */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         {/* Sync Status */}
         <div style={cardStyle}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
