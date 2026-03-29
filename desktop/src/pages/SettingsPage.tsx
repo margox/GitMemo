@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Settings, Power, Clipboard, Sun, Moon, GitBranch, ExternalLink, Globe } from "lucide-react";
+import { Settings, Power, Clipboard, Sun, Moon, GitBranch, ExternalLink, Globe, FolderOpen, Globe2 } from "lucide-react";
 import type { Theme } from "../App";
 import { useI18n, type Locale } from "../hooks/useI18n";
 import { useToast } from "../hooks/useToast";
@@ -54,10 +54,16 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
   const [branch, setBranch] = useState("");
   const [branchInput, setBranchInput] = useState("");
   const [editingBranch, setEditingBranch] = useState(false);
+  const [syncDir, setSyncDir] = useState("");
+  const [gitRemote, setGitRemote] = useState("");
 
   useEffect(() => {
     invoke<DesktopSettings>("get_settings").then(setSettings).catch(console.error);
     invoke<string>("get_branch").then((b) => { setBranch(b); setBranchInput(b); }).catch(console.error);
+    invoke<{ sync_dir: string; git_remote: string }>("get_status").then((s) => {
+      setSyncDir(s.sync_dir);
+      setGitRemote(s.git_remote);
+    }).catch(console.error);
   }, []);
 
   const toggleAutostart = async () => {
@@ -231,6 +237,44 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
                 {branch || "main"}
               </button>
             )}
+          </div>
+
+          <div style={{ borderTop: "1px solid var(--border)" }} />
+
+          {/* Data directory */}
+          <div style={rowStyle}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+              <FolderOpen size={15} style={{ color: "var(--text-secondary)", flexShrink: 0 }} />
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontSize: 13, fontWeight: 500 }}>{t("settings.dataDir")}</p>
+                <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>{t("settings.dataDirDesc")}</p>
+              </div>
+            </div>
+            <span style={{
+              fontSize: 11, color: "var(--text-secondary)", fontFamily: "ui-monospace, monospace",
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200,
+            }} title={syncDir}>
+              {syncDir || "—"}
+            </span>
+          </div>
+
+          <div style={{ borderTop: "1px solid var(--border)" }} />
+
+          {/* Remote repo */}
+          <div style={rowStyle}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+              <Globe2 size={15} style={{ color: "var(--text-secondary)", flexShrink: 0 }} />
+              <div style={{ minWidth: 0 }}>
+                <p style={{ fontSize: 13, fontWeight: 500 }}>{t("settings.remoteRepo")}</p>
+                <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>{t("settings.remoteRepoDesc")}</p>
+              </div>
+            </div>
+            <span style={{
+              fontSize: 11, color: "var(--text-secondary)", fontFamily: "ui-monospace, monospace",
+              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200,
+            }} title={gitRemote}>
+              {gitRemote || t("settings.noRemote")}
+            </span>
           </div>
         </div>
       </div>

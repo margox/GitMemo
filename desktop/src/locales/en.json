@@ -100,6 +100,11 @@
     "clipboardAutostartDesc": "Begin capturing clipboard on launch",
     "syncBranch": "Sync branch",
     "syncBranchDesc": "Git branch used for syncing",
+    "dataDir": "Data directory",
+    "dataDirDesc": "Where your notes and conversations are stored",
+    "remoteRepo": "Remote repository",
+    "remoteRepoDesc": "Git remote for syncing",
+    "noRemote": "Not configured",
     "dark": "dark",
     "light": "light"
   },

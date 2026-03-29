@@ -100,6 +100,11 @@
     "clipboardAutostartDesc": "启动时开始捕获剪贴板",
     "syncBranch": "同步分支",
     "syncBranchDesc": "用于同步的 Git 分支",
+    "dataDir": "数据目录",
+    "dataDirDesc": "笔记和对话的存储位置",
+    "remoteRepo": "远程仓库",
+    "remoteRepoDesc": "用于同步的 Git 远程地址",
+    "noRemote": "未配置",
     "dark": "深色",
     "light": "浅色"
   },
