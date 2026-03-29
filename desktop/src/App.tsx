@@ -61,6 +61,24 @@ function App() {
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
+      // Sidebar navigation with arrow keys
+      if (sidebarFocused) {
+        const pages: Page[] = ["dashboard", "search", "conversations", "notes", "clipboard", "plans", "settings"];
+        const idx = pages.indexOf(currentPage);
+        if (e.key === "ArrowUp" && idx > 0) {
+          e.preventDefault();
+          setCurrentPage(pages[idx - 1]);
+        }
+        if (e.key === "ArrowDown" && idx < pages.length - 1) {
+          e.preventDefault();
+          setCurrentPage(pages[idx + 1]);
+        }
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          setSidebarFocused(false);
+        }
+        return;
+      }
       if (e.metaKey || e.ctrlKey) {
         switch (e.key) {
           case "1": e.preventDefault(); setCurrentPage("dashboard"); setSidebarFocused(false); break;
@@ -83,7 +101,7 @@ function App() {
       unlistenSearch.then((fn) => fn());
       unlistenClip.then((fn) => fn());
     };
-  }, [navigateAndFocus, sidebarFocused]);
+  }, [navigateAndFocus, sidebarFocused, currentPage]);
 
   return (
     <div style={{ display: "flex", height: "100vh", width: "100vw" }}>
