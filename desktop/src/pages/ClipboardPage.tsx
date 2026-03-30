@@ -31,7 +31,7 @@ interface FileEntry {
   preview: string;
 }
 
-export default function ClipboardPage() {
+export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTrigger: _enterTrigger }: { onFocusSidebar?: () => void; enterTrigger?: number } = {}) {
   const { t } = useI18n();
   const { showToast } = useToast();
   const panel = useResizablePanel("clipboard", 340);

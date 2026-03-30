@@ -15,7 +15,7 @@ interface FileEntry {
   preview: string;
 }
 
-export default function PlansPage() {
+export default function PlansPage({ onFocusSidebar: _onFocusSidebar, enterTrigger: _enterTrigger }: { onFocusSidebar?: () => void; enterTrigger?: number } = {}) {
   const { t } = useI18n();
   const panel = useResizablePanel("plans", 300);
   const [files, setFiles] = useState<FileEntry[]>([]);

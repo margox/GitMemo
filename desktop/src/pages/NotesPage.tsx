@@ -31,7 +31,7 @@ const tabs: { id: NoteTab; labelKey: string; icon: typeof FileText; folder: stri
   { id: "manual", labelKey: "notes.manual", icon: BookOpen, folder: "notes/manual" },
 ];
 
-export default function NotesPage({ focusTrigger }: { focusTrigger?: number }) {
+export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSidebar, enterTrigger: _enterTrigger }: { focusTrigger?: number; onFocusSidebar?: () => void; enterTrigger?: number }) {
   const { t } = useI18n();
   const { showToast } = useToast();
   const panel = useResizablePanel("notes", 300);

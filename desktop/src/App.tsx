@@ -121,7 +121,7 @@ function App() {
       />
       <main style={{ flex: 1, overflow: "hidden" }} onClick={() => setSidebarFocused(false)}>
         {currentPage === "dashboard" && <DashboardPage onNavigate={setCurrentPage} />}
-        {currentPage === "conversations" && <ConversationsPage onFocusSidebar={focusSidebar} enterTrigger={enterContentTrigger} />}
+        {currentPage === "conversations" && <ConversationsPage onFocusSidebar={focusSidebar} enterTrigger={enterContentTrigger} sidebarFocused={sidebarFocused} />}
         {currentPage === "notes" && <NotesPage focusTrigger={focusTrigger} onFocusSidebar={focusSidebar} enterTrigger={enterContentTrigger} />}
         {currentPage === "clipboard" && <ClipboardPage onFocusSidebar={focusSidebar} enterTrigger={enterContentTrigger} />}
         {currentPage === "plans" && <PlansPage onFocusSidebar={focusSidebar} enterTrigger={enterContentTrigger} />}
