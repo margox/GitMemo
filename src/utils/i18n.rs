@@ -153,6 +153,90 @@ impl I18n {
         }
     }
 
+    pub fn ssh_key_found_system(&self) -> &str {
+        match self.lang {
+            Lang::En => "Using existing SSH key",
+            Lang::Zh => "使用已有的 SSH 密钥",
+        }
+    }
+
+    pub fn ssh_url_recommended(&self) -> &str {
+        match self.lang {
+            Lang::En => "SSH URL is recommended for automatic sync (no password needed):",
+            Lang::Zh => "推荐使用 SSH 地址进行自动同步（无需密码）：",
+        }
+    }
+
+    pub fn use_ssh_url(&self) -> &str {
+        match self.lang {
+            Lang::En => "Use SSH URL (recommended)",
+            Lang::Zh => "使用 SSH 地址（推荐）",
+        }
+    }
+
+    pub fn keep_https_url(&self) -> &str {
+        match self.lang {
+            Lang::En => "Keep HTTPS URL",
+            Lang::Zh => "保持 HTTPS 地址",
+        }
+    }
+
+    pub fn choose_url_prompt(&self) -> &str {
+        match self.lang {
+            Lang::En => "Choose URL type",
+            Lang::Zh => "选择地址类型",
+        }
+    }
+
+    pub fn testing_ssh(&self) -> &str {
+        match self.lang {
+            Lang::En => "Testing SSH connection",
+            Lang::Zh => "正在测试 SSH 连接",
+        }
+    }
+
+    pub fn ssh_test_ok(&self) -> &str {
+        match self.lang {
+            Lang::En => "SSH connection OK",
+            Lang::Zh => "SSH 连接正常",
+        }
+    }
+
+    pub fn ssh_test_auth_failed(&self) -> &str {
+        match self.lang {
+            Lang::En => "SSH authentication failed — public key not recognized",
+            Lang::Zh => "SSH 认证失败 — 公钥未被识别",
+        }
+    }
+
+    pub fn ssh_test_check_key(&self) -> &str {
+        match self.lang {
+            Lang::En => "Please ensure your SSH key is added to the Git hosting service",
+            Lang::Zh => "请确认 SSH 密钥已添加到 Git 托管平台",
+        }
+    }
+
+    pub fn ssh_test_connection_failed(&self) -> &str {
+        match self.lang {
+            Lang::En => "SSH connection failed — cannot reach host",
+            Lang::Zh => "SSH 连接失败 — 无法访问主机",
+        }
+    }
+
+    pub fn ssh_test_unknown(&self) -> &str {
+        match self.lang {
+            Lang::En => "SSH connection status unclear, may need manual check",
+            Lang::Zh => "SSH 连接状态不确定，可能需要手动检查",
+        }
+    }
+
+    pub fn ssh_test_error(&self) -> &str {
+        match self.lang {
+            Lang::En => "SSH test error:",
+            Lang::Zh => "SSH 测试出错：",
+        }
+    }
+
     pub fn configs_backed_up(&self) -> &str {
         match self.lang {
             Lang::En => "Original configs backed up",

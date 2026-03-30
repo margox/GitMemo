@@ -36,6 +36,27 @@ fn configured_branch(repo_path: &Path) -> String {
     "main".to_string()
 }
 
+/// Resolve the SSH key path for git operations.
+/// Checks gitmemo's .ssh dir first, then falls back to system ~/.ssh/
+fn resolve_ssh_key(repo_path: &Path) -> Option<std::path::PathBuf> {
+    // Check gitmemo's own key
+    let gitmemo_key = repo_path.join(".ssh").join("id_ed25519");
+    if gitmemo_key.exists() {
+        return Some(gitmemo_key);
+    }
+    // Check system key
+    crate::utils::ssh::find_existing_key()
+}
+
+/// Apply GIT_SSH_COMMAND env to a Command if needed
+fn apply_ssh_env(cmd: &mut std::process::Command, repo_path: &Path) {
+    if let Some(key_path) = resolve_ssh_key(repo_path) {
+        if let Some(ssh_cmd) = crate::utils::ssh::git_ssh_command(&key_path) {
+            cmd.env("GIT_SSH_COMMAND", ssh_cmd);
+        }
+    }
+}
+
 /// Initialize or open Git repository at the given path
 pub fn init_repo(repo_path: &Path, remote_url: &str) -> Result<git2::Repository> {
     let repo = if repo_path.join(".git").exists() {
@@ -65,12 +86,13 @@ pub fn init_repo(repo_path: &Path, remote_url: &str) -> Result<git2::Repository>
 /// Returns "main" or "master" etc.
 pub fn detect_remote_branch(repo_path: &Path) -> String {
     // Method 1: ls-remote --symref (most reliable)
-    let output = std::process::Command::new("git")
-        .args(["ls-remote", "--symref", "origin", "HEAD"])
+    let mut cmd = std::process::Command::new("git");
+    cmd.args(["ls-remote", "--symref", "origin", "HEAD"])
         .current_dir(repo_path)
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .output();
+        .stderr(std::process::Stdio::piped());
+    apply_ssh_env(&mut cmd, repo_path);
+    let output = cmd.output();
 
     if let Ok(o) = output {
         if o.status.success() {
@@ -162,12 +184,13 @@ fn do_push(repo_path: &Path) -> (bool, Option<String>) {
     let branch = configured_branch(repo_path);
 
     // Use -u to set upstream tracking on first push
-    let output = std::process::Command::new("git")
-        .args(["push", "-u", "origin", &format!("HEAD:{}", branch)])
+    let mut cmd = std::process::Command::new("git");
+    cmd.args(["push", "-u", "origin", &format!("HEAD:{}", branch)])
         .current_dir(repo_path)
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .output();
+        .stderr(std::process::Stdio::piped());
+    apply_ssh_env(&mut cmd, repo_path);
+    let output = cmd.output();
 
     match output {
         Ok(o) if o.status.success() => (true, None),
@@ -326,13 +349,13 @@ fn count_via_ls_remote(repo_path: &Path) -> Option<usize> {
 
     // Get remote branch hash (try configured branch first, then HEAD)
     let remote_ref = format!("refs/heads/{}", cfg_branch);
-    let remote_output = std::process::Command::new("git")
-        .args(["ls-remote", "origin", &remote_ref])
+    let mut cmd = std::process::Command::new("git");
+    cmd.args(["ls-remote", "origin", &remote_ref])
         .current_dir(repo_path)
         .stdout(std::process::Stdio::piped())
-        .stderr(std::process::Stdio::piped())
-        .output()
-        .ok()?;
+        .stderr(std::process::Stdio::piped());
+    apply_ssh_env(&mut cmd, repo_path);
+    let remote_output = cmd.output().ok()?;
 
     let remote_head = if remote_output.status.success() {
         let remote_str = String::from_utf8_lossy(&remote_output.stdout).trim().to_string();
@@ -343,13 +366,13 @@ fn count_via_ls_remote(repo_path: &Path) -> Option<usize> {
 
     // If couldn't get from configured branch, try HEAD
     let remote_head = if remote_head.is_empty() {
-        let head_output = std::process::Command::new("git")
-            .args(["ls-remote", "origin", "HEAD"])
+        let mut cmd = std::process::Command::new("git");
+        cmd.args(["ls-remote", "origin", "HEAD"])
             .current_dir(repo_path)
             .stdout(std::process::Stdio::piped())
-            .stderr(std::process::Stdio::piped())
-            .output()
-            .ok()?;
+            .stderr(std::process::Stdio::piped());
+        apply_ssh_env(&mut cmd, repo_path);
+        let head_output = cmd.output().ok()?;
 
         if !head_output.status.success() {
             return None;

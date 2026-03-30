@@ -187,6 +187,34 @@ fn cmd_init(git_url: Option<String>, path: Option<String>, no_mcp: bool, editor:
         }
     };
 
+    // 2b. If HTTPS URL provided, suggest SSH alternative
+    let url = if !utils::ssh::is_ssh_url(&url) {
+        if let Some(ssh_url) = utils::ssh::https_to_ssh(&url) {
+            println!();
+            println!("  {} {}", style("ℹ").yellow(), t.ssh_url_recommended());
+            println!("    HTTPS: {}", style(&url).dim());
+            println!("    SSH:   {}", style(&ssh_url).cyan());
+            println!();
+            let options = vec![
+                t.use_ssh_url(),
+                t.keep_https_url(),
+            ];
+            let selection = Select::new()
+                .with_prompt(t.choose_url_prompt())
+                .items(&options)
+                .default(0)
+                .interact()?;
+            match selection {
+                0 => ssh_url,
+                _ => url,
+            }
+        } else {
+            url
+        }
+    } else {
+        url
+    };
+
     // 3. Create directory structure (safe for existing dirs)
     storage::files::create_directory_structure(&sync_dir)?;
     println!("  {} {}", style("✓").green(), t.dir_structure_ready());
@@ -195,12 +223,19 @@ fn cmd_init(git_url: Option<String>, path: Option<String>, no_mcp: bool, editor:
     storage::git::init_repo(&sync_dir, &url)?;
     println!("  {} {}", style("✓").green(), t.git_repo_ready());
 
-    // 5. Generate SSH key (skip if exists)
+    // 5. Generate SSH key (detect existing or create new)
     let ssh_dir = sync_dir.join(".ssh");
-    let (key_path, is_new_key) = utils::ssh::generate_key(&ssh_dir)?;
+    let (key_path, is_new_key, is_system_key) = utils::ssh::find_or_generate_key(&ssh_dir)?;
     let pub_key = utils::ssh::read_public_key(&key_path)?;
     if is_new_key {
         println!("  {} {}", style("✓").green(), t.ssh_key_generated());
+    } else if is_system_key {
+        println!(
+            "  {} {} ({})",
+            style("✓").green(),
+            t.ssh_key_found_system(),
+            style(key_path.display()).dim()
+        );
     } else {
         println!("  {} {}", style("✓").green(), t.ssh_key_exists());
     }
@@ -277,7 +312,7 @@ fn cmd_init(git_url: Option<String>, path: Option<String>, no_mcp: bool, editor:
     let branch = storage::git::detect_remote_branch(&sync_dir);
     let config = utils::config::Config {
         git: utils::config::GitConfig {
-            remote: url,
+            remote: url.clone(),
             branch: branch.clone(),
         },
         lang: lang.as_str().to_string(),
@@ -288,9 +323,55 @@ fn cmd_init(git_url: Option<String>, path: Option<String>, no_mcp: bool, editor:
     storage::git::commit_and_push(&sync_dir, "init: gitmemo")?;
     storage::git::setup_tracking(&sync_dir, &branch);
 
-    // 10. Show public key and next steps
+    // 10. Test SSH connection (if SSH URL)
+    if utils::ssh::is_ssh_url(&url) {
+        print!("  {} {}...", style("⟳").blue(), t.testing_ssh());
+        match utils::ssh::test_ssh_connection(&key_path, &url) {
+            Ok(utils::ssh::SshTestResult::Success(msg)) => {
+                println!("\r  {} {}  ", style("✓").green(), t.ssh_test_ok());
+                if !msg.is_empty() {
+                    println!("    {}", style(&msg).dim());
+                }
+            }
+            Ok(utils::ssh::SshTestResult::AuthFailed(_)) => {
+                println!("\r  {} {}  ", style("✗").red(), t.ssh_test_auth_failed());
+                if !is_system_key {
+                    println!();
+                    println!(
+                        "  {} {}",
+                        style("→").yellow(),
+                        t.deploy_key_hint()
+                    );
+                    println!();
+                    println!("  {}", style(&pub_key).dim());
+                    println!();
+                } else {
+                    println!("    {}", t.ssh_test_check_key());
+                }
+            }
+            Ok(utils::ssh::SshTestResult::ConnectionFailed(msg)) => {
+                println!("\r  {} {}  ", style("✗").red(), t.ssh_test_connection_failed());
+                println!("    {}", style(&msg).dim());
+            }
+            Ok(utils::ssh::SshTestResult::NotSsh) => {
+                // Not SSH URL, skip
+            }
+            Ok(utils::ssh::SshTestResult::Unknown(msg)) => {
+                println!("\r  {} {}  ", style("⚠").yellow(), t.ssh_test_unknown());
+                if !msg.is_empty() {
+                    println!("    {}", style(&msg).dim());
+                }
+            }
+            Err(e) => {
+                println!("\r  {} {} {}  ", style("⚠").yellow(), t.ssh_test_error(), e);
+            }
+        }
+    }
+
+    // 11. Show public key and next steps
     println!();
-    if is_new_key {
+    // Show deploy key hint only if: new key + SSH URL + we haven't shown it in the SSH test above
+    if is_new_key && !utils::ssh::is_ssh_url(&url) {
         println!(
             "  {} {}",
             style("→").yellow(),
