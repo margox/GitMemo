@@ -158,6 +158,39 @@ pub fn is_ssh_url(url: &str) -> bool {
     url.starts_with("git@") || url.starts_with("ssh://")
 }
 
+/// Extract host and path from a git SSH URL
+/// "git@github.com:user/repo.git" → ("github.com", "user/repo")
+fn extract_host_path(url: &str) -> Option<(String, String)> {
+    if let Some(at_pos) = url.find('@') {
+        let after_at = &url[at_pos + 1..];
+        if let Some(colon_pos) = after_at.find(':') {
+            let host = after_at[..colon_pos].to_string();
+            let path = after_at[colon_pos + 1..].trim_end_matches(".git").to_string();
+            return Some((host, path));
+        }
+    }
+    None
+}
+
+/// Build the Deploy Keys settings URL for a git SSH URL
+pub fn deploy_keys_url(git_url: &str) -> Option<String> {
+    let (host, path) = extract_host_path(git_url)?;
+    match host.as_str() {
+        "github.com" => Some(format!("https://github.com/{}/settings/keys", path)),
+        "gitee.com" => Some(format!("https://gitee.com/{}/keys", path)),
+        "gitlab.com" => Some(format!("https://gitlab.com/{}/-/settings/repository", path)),
+        _ => Some(format!("https://{}/{}/settings", host, path)),
+    }
+}
+
+/// Open a URL in the default browser
+pub fn open_browser(url: &str) {
+    #[cfg(target_os = "macos")]
+    let _ = std::process::Command::new("open").arg(url).spawn();
+    #[cfg(target_os = "linux")]
+    let _ = std::process::Command::new("xdg-open").arg(url).spawn();
+}
+
 /// Convert HTTPS GitHub/GitLab URL to SSH format
 pub fn https_to_ssh(url: &str) -> Option<String> {
     if !url.starts_with("https://") && !url.starts_with("http://") {

@@ -68,6 +68,9 @@ fn main() -> Result<()> {
         Commands::Branch { name } => {
             cmd_branch(name)?;
         }
+        Commands::Remote { url, remove } => {
+            cmd_remote(url, remove)?;
+        }
     }
 
     Ok(())
@@ -160,35 +163,40 @@ fn cmd_init(git_url: Option<String>, path: Option<String>, no_mcp: bool, editor:
 
     let sync_dir_str = sync_dir.to_string_lossy().to_string();
 
-    // 2. Get Git URL (auto-detect from existing repo if --path)
+    // 2. Get Git URL (optional — empty means local-only mode)
     let url = match git_url {
         Some(u) => u,
         None => {
             // Try to read from existing repo
-            if let Ok(repo) = git2::Repository::open(&sync_dir) {
+            let auto_detected = if let Ok(repo) = git2::Repository::open(&sync_dir) {
                 if let Ok(remote) = repo.find_remote("origin") {
-                    if let Some(existing_url) = remote.url() {
-                        println!(
-                            "  {} {}: {}",
-                            style("ℹ").blue(),
-                            t.detected_remote(),
-                            existing_url
-                        );
-                        existing_url.to_string()
-                    } else {
-                        Input::new().with_prompt(t.git_url_prompt()).interact_text()?
-                    }
-                } else {
-                    Input::new().with_prompt(t.git_url_prompt()).interact_text()?
-                }
+                    remote.url().map(|u| u.to_string())
+                } else { None }
+            } else { None };
+
+            if let Some(existing_url) = auto_detected {
+                println!(
+                    "  {} {}: {}",
+                    style("ℹ").blue(),
+                    t.detected_remote(),
+                    existing_url
+                );
+                existing_url
             } else {
-                Input::new().with_prompt(t.git_url_prompt()).interact_text()?
+                // Allow empty input for local-only mode
+                let input: String = Input::new()
+                    .with_prompt(t.git_url_prompt())
+                    .allow_empty(true)
+                    .interact_text()?;
+                input
             }
         }
     };
 
+    let has_remote = !url.is_empty();
+
     // 2b. If HTTPS URL provided, suggest SSH alternative
-    let url = if !utils::ssh::is_ssh_url(&url) {
+    let url = if has_remote && !utils::ssh::is_ssh_url(&url) {
         if let Some(ssh_url) = utils::ssh::https_to_ssh(&url) {
             println!();
             println!("  {} {}", style("ℹ").yellow(), t.ssh_url_recommended());
@@ -215,6 +223,10 @@ fn cmd_init(git_url: Option<String>, path: Option<String>, no_mcp: bool, editor:
         url
     };
 
+    if !has_remote {
+        println!("  {} {}", style("ℹ").blue(), t.local_mode_selected());
+    }
+
     // 3. Create directory structure (safe for existing dirs)
     storage::files::create_directory_structure(&sync_dir)?;
     println!("  {} {}", style("✓").green(), t.dir_structure_ready());
@@ -223,19 +235,19 @@ fn cmd_init(git_url: Option<String>, path: Option<String>, no_mcp: bool, editor:
     storage::git::init_repo(&sync_dir, &url)?;
     println!("  {} {}", style("✓").green(), t.git_repo_ready());
 
-    // 5. Find or generate SSH key in ~/.ssh/
-    let (key_path, is_new_key) = utils::ssh::find_or_generate_key()?;
-    let pub_key = utils::ssh::read_public_key(&key_path)?;
-    if is_new_key {
-        println!("  {} {} ({})", style("✓").green(), t.ssh_key_generated(), style(key_path.display()).dim());
+    // 5. Find or generate SSH key (only if remote is configured)
+    let key_path_and_pub = if has_remote {
+        let (key_path, is_new_key) = utils::ssh::find_or_generate_key()?;
+        let pub_key = utils::ssh::read_public_key(&key_path)?;
+        if is_new_key {
+            println!("  {} {} ({})", style("✓").green(), t.ssh_key_generated(), style(key_path.display()).dim());
+        } else {
+            println!("  {} {} ({})", style("✓").green(), t.ssh_key_exists(), style(key_path.display()).dim());
+        }
+        Some((key_path, pub_key, is_new_key))
     } else {
-        println!(
-            "  {} {} ({})",
-            style("✓").green(),
-            t.ssh_key_exists(),
-            style(key_path.display()).dim()
-        );
-    }
+        None
+    };
 
     // 6. Backup existing configs before injection
     let backup_dir = sync_dir.join(".backups");
@@ -305,8 +317,12 @@ fn cmd_init(git_url: Option<String>, path: Option<String>, no_mcp: bool, editor:
         }
     }
 
-    // 8. Detect remote default branch and save config
-    let branch = storage::git::detect_remote_branch(&sync_dir);
+    // 8. Detect remote default branch (or default to "main") and save config
+    let branch = if has_remote {
+        storage::git::detect_remote_branch(&sync_dir)
+    } else {
+        "main".to_string()
+    };
     let config = utils::config::Config {
         git: utils::config::GitConfig {
             remote: url.clone(),
@@ -316,63 +332,72 @@ fn cmd_init(git_url: Option<String>, path: Option<String>, no_mcp: bool, editor:
     };
     config.save(&utils::config::Config::config_path())?;
 
-    // 9. Initial commit + set upstream tracking
+    // 9. Initial commit (push only if remote configured)
     storage::git::commit_and_push(&sync_dir, "init: gitmemo")?;
-    storage::git::setup_tracking(&sync_dir, &branch);
+    if has_remote {
+        storage::git::setup_tracking(&sync_dir, &branch);
+    }
 
-    // 10. Test SSH connection (if SSH URL)
-    if utils::ssh::is_ssh_url(&url) {
-        print!("  {} {}...", style("⟳").blue(), t.testing_ssh());
-        match utils::ssh::test_ssh_connection(&key_path, &url) {
-            Ok(utils::ssh::SshTestResult::Success(msg)) => {
-                println!("\r  {} {}  ", style("✓").green(), t.ssh_test_ok());
-                if !msg.is_empty() {
+    // 10. Test SSH connection + open browser on failure (only if SSH URL)
+    if has_remote && utils::ssh::is_ssh_url(&url) {
+        if let Some((ref key_path, ref pub_key, _)) = key_path_and_pub {
+            print!("  {} {}...", style("⟳").blue(), t.testing_ssh());
+            match utils::ssh::test_ssh_connection(key_path, &url) {
+                Ok(utils::ssh::SshTestResult::Success(msg)) => {
+                    println!("\r  {} {}  ", style("✓").green(), t.ssh_test_ok());
+                    if !msg.is_empty() {
+                        println!("    {}", style(&msg).dim());
+                    }
+                }
+                Ok(utils::ssh::SshTestResult::AuthFailed(_)) => {
+                    println!("\r  {} {}  ", style("✗").red(), t.ssh_test_auth_failed());
+                    println!();
+                    println!(
+                        "  {} {}",
+                        style("→").yellow(),
+                        t.deploy_key_hint()
+                    );
+                    println!();
+                    println!("  {}", style(pub_key).dim());
+                    println!();
+                    // Try to open Deploy Keys page in browser
+                    if let Some(keys_url) = utils::ssh::deploy_keys_url(&url) {
+                        println!("  {} {}", style("→").yellow(), t.opening_browser());
+                        utils::ssh::open_browser(&keys_url);
+                    }
+                }
+                Ok(utils::ssh::SshTestResult::ConnectionFailed(msg)) => {
+                    println!("\r  {} {}  ", style("✗").red(), t.ssh_test_connection_failed());
                     println!("    {}", style(&msg).dim());
                 }
-            }
-            Ok(utils::ssh::SshTestResult::AuthFailed(_)) => {
-                println!("\r  {} {}  ", style("✗").red(), t.ssh_test_auth_failed());
-                println!();
-                println!(
-                    "  {} {}",
-                    style("→").yellow(),
-                    t.deploy_key_hint()
-                );
-                println!();
-                println!("  {}", style(&pub_key).dim());
-                println!();
-            }
-            Ok(utils::ssh::SshTestResult::ConnectionFailed(msg)) => {
-                println!("\r  {} {}  ", style("✗").red(), t.ssh_test_connection_failed());
-                println!("    {}", style(&msg).dim());
-            }
-            Ok(utils::ssh::SshTestResult::NotSsh) => {
-                // Not SSH URL, skip
-            }
-            Ok(utils::ssh::SshTestResult::Unknown(msg)) => {
-                println!("\r  {} {}  ", style("⚠").yellow(), t.ssh_test_unknown());
-                if !msg.is_empty() {
-                    println!("    {}", style(&msg).dim());
+                Ok(utils::ssh::SshTestResult::NotSsh) => {}
+                Ok(utils::ssh::SshTestResult::Unknown(msg)) => {
+                    println!("\r  {} {}  ", style("⚠").yellow(), t.ssh_test_unknown());
+                    if !msg.is_empty() {
+                        println!("    {}", style(&msg).dim());
+                    }
                 }
-            }
-            Err(e) => {
-                println!("\r  {} {} {}  ", style("⚠").yellow(), t.ssh_test_error(), e);
+                Err(e) => {
+                    println!("\r  {} {} {}  ", style("⚠").yellow(), t.ssh_test_error(), e);
+                }
             }
         }
     }
 
     // 11. Show public key and next steps
     println!();
-    // Show deploy key hint only if: new key + SSH URL + we haven't shown it in the SSH test above
-    if is_new_key && !utils::ssh::is_ssh_url(&url) {
-        println!(
-            "  {} {}",
-            style("→").yellow(),
-            t.deploy_key_hint()
-        );
-        println!();
-        println!("  {}", style(&pub_key).dim());
-        println!();
+    // Show deploy key hint for new key + non-SSH URL (SSH case already handled above)
+    if let Some((_, ref pub_key, true)) = key_path_and_pub {
+        if !utils::ssh::is_ssh_url(&url) {
+            println!(
+                "  {} {}",
+                style("→").yellow(),
+                t.deploy_key_hint()
+            );
+            println!();
+            println!("  {}", style(pub_key).dim());
+            println!();
+        }
     }
     println!(
         "  {}",
@@ -486,8 +511,12 @@ fn cmd_status() -> Result<()> {
     let config_path = utils::config::Config::config_path();
     if config_path.exists() {
         let config = utils::config::Config::load(&config_path)?;
-        println!("  {}: {}", t.git_remote(), config.git.remote);
-        println!("  {}: {}", t.git_branch(), config.git.branch);
+        if config.has_remote() {
+            println!("  {}: {}", t.git_remote(), config.git.remote);
+            println!("  {}: {}", t.git_branch(), config.git.branch);
+        } else {
+            println!("  {}", t.sync_mode_local());
+        }
     }
 
     // Count files
@@ -505,23 +534,24 @@ fn cmd_status() -> Result<()> {
     println!("  {}: {}", t.conversations_count(), conv_count);
     println!("  {}: {}", t.notes_count(), note_count);
 
-    // Show unpushed count
-    let unpushed = storage::git::unpushed_count(&sync_dir).unwrap_or(0);
-    if unpushed > 0 {
-        println!(
-            "  {}",
-            t.unpushed_commits(unpushed)
-                .replace("gitmemo sync", &style("gitmemo sync").cyan().to_string())
-        );
-    } else if storage::git::has_unpushed(&sync_dir) {
-        // Count returned 0 but has_unpushed thinks there might be — show uncertain state
-        println!(
-            "  {}",
-            t.unpushed_commits(0)
-                .replace("gitmemo sync", &style("gitmemo sync").cyan().to_string())
-        );
-    } else {
-        println!("  {}", t.sync_ok());
+    // Show sync status (only if remote configured)
+    if storage::git::has_remote(&sync_dir) {
+        let unpushed = storage::git::unpushed_count(&sync_dir).unwrap_or(0);
+        if unpushed > 0 {
+            println!(
+                "  {}",
+                t.unpushed_commits(unpushed)
+                    .replace("gitmemo sync", &style("gitmemo sync").cyan().to_string())
+            );
+        } else if storage::git::has_unpushed(&sync_dir) {
+            println!(
+                "  {}",
+                t.unpushed_commits(0)
+                    .replace("gitmemo sync", &style("gitmemo sync").cyan().to_string())
+            );
+        } else {
+            println!("  {}", t.sync_ok());
+        }
     }
     println!();
 
@@ -542,11 +572,12 @@ fn cmd_sync() -> Result<()> {
     let t = utils::i18n::get();
     let sync_dir = ensure_init()?;
 
+    let has_remote = storage::git::has_remote(&sync_dir);
+
     // First try commit + push
     let result = storage::git::commit_and_push(&sync_dir, "auto: sync")?;
     if result.committed {
         print_sync_status(&result);
-        // If committed but push failed, don't return early — report the error
         if !result.pushed {
             if let Some(ref err) = result.push_error {
                 println!("  {} {}", style("✗").red(), t.push_failed(err));
@@ -555,8 +586,13 @@ fn cmd_sync() -> Result<()> {
         return Ok(());
     }
 
-    // No new changes to commit, but maybe there are unpushed commits
-    // Use has_unpushed which defaults to true when uncertain (safer)
+    // No new changes to commit
+    if !has_remote {
+        println!("  {} {}", style("✓").green(), t.all_synced());
+        return Ok(());
+    }
+
+    // Maybe there are unpushed commits
     if storage::git::has_unpushed(&sync_dir) {
         let unpushed = storage::git::unpushed_count(&sync_dir).unwrap_or(0);
         let count_label = if unpushed > 0 {
@@ -629,7 +665,8 @@ fn print_sync_status(result: &storage::git::SyncResult) {
         let hint = t.retry_push_hint().replace("{}", &style("gitmemo sync").cyan().to_string());
         println!("    {}", hint);
     } else {
-        println!("  {} {}", style("ℹ").blue(), t.committing());
+        // Committed but no push attempted (local-only mode)
+        println!("  {} {}", style("✓").green(), t.local_saved_hint());
     }
 }
 
@@ -882,6 +919,124 @@ fn cmd_branch(name: Option<String>) -> Result<()> {
                 style("✓").green(),
                 t.branch_switched(&old_branch, &new_branch)
             );
+        }
+    }
+
+    Ok(())
+}
+
+fn cmd_remote(url: Option<String>, remove: bool) -> Result<()> {
+    use console::style;
+    use dialoguer::Select;
+    let t = utils::i18n::get();
+    let sync_dir = ensure_init()?;
+
+    let config_path = utils::config::Config::config_path();
+    let mut config = utils::config::Config::load(&config_path)?;
+
+    if remove {
+        config.git.remote = String::new();
+        config.save(&config_path)?;
+        let _ = std::process::Command::new("git")
+            .args(["remote", "remove", "origin"])
+            .current_dir(&sync_dir)
+            .output();
+        println!("  {} {}", style("✓").green(), t.remote_removed());
+        return Ok(());
+    }
+
+    match url {
+        None => {
+            if config.has_remote() {
+                println!("  {}", t.remote_current(&config.git.remote));
+            } else {
+                println!("  {}", t.remote_none());
+            }
+        }
+        Some(new_url) => {
+            if config.git.remote == new_url {
+                println!("  {} {}", style("ℹ").blue(), t.remote_same(&new_url));
+                return Ok(());
+            }
+
+            // Suggest SSH if HTTPS
+            let new_url = if !utils::ssh::is_ssh_url(&new_url) {
+                if let Some(ssh_url) = utils::ssh::https_to_ssh(&new_url) {
+                    println!();
+                    println!("  {} {}", style("ℹ").yellow(), t.ssh_url_recommended());
+                    println!("    HTTPS: {}", style(&new_url).dim());
+                    println!("    SSH:   {}", style(&ssh_url).cyan());
+                    println!();
+                    let options = vec![t.use_ssh_url(), t.keep_https_url()];
+                    let selection = Select::new()
+                        .with_prompt(t.choose_url_prompt())
+                        .items(&options)
+                        .default(0)
+                        .interact()?;
+                    match selection { 0 => ssh_url, _ => new_url }
+                } else { new_url }
+            } else { new_url };
+
+            // SSH key check
+            let (key_path, is_new_key) = utils::ssh::find_or_generate_key()?;
+            let pub_key = utils::ssh::read_public_key(&key_path)?;
+            if is_new_key {
+                println!("  {} {}", style("✓").green(), t.ssh_key_generated());
+            }
+
+            // Update git remote
+            storage::git::init_repo(&sync_dir, &new_url)?;
+
+            // Detect branch and update config
+            let branch = storage::git::detect_remote_branch(&sync_dir);
+            config.git.remote = new_url.clone();
+            config.git.branch = branch.clone();
+            config.save(&config_path)?;
+            storage::git::setup_tracking(&sync_dir, &branch);
+            println!("  {} {}", style("✓").green(), t.remote_set_ok());
+
+            // Test SSH connection
+            if utils::ssh::is_ssh_url(&new_url) {
+                print!("  {} {}...", style("⟳").blue(), t.testing_ssh());
+                match utils::ssh::test_ssh_connection(&key_path, &new_url) {
+                    Ok(utils::ssh::SshTestResult::Success(msg)) => {
+                        println!("\r  {} {}  ", style("✓").green(), t.ssh_test_ok());
+                        if !msg.is_empty() { println!("    {}", style(&msg).dim()); }
+                    }
+                    Ok(utils::ssh::SshTestResult::AuthFailed(_)) => {
+                        println!("\r  {} {}  ", style("✗").red(), t.ssh_test_auth_failed());
+                        println!();
+                        println!("  {} {}", style("→").yellow(), t.deploy_key_hint());
+                        println!();
+                        println!("  {}", style(&pub_key).dim());
+                        println!();
+                        if let Some(keys_url) = utils::ssh::deploy_keys_url(&new_url) {
+                            println!("  {} {}", style("→").yellow(), t.opening_browser());
+                            utils::ssh::open_browser(&keys_url);
+                        }
+                        return Ok(());
+                    }
+                    Ok(utils::ssh::SshTestResult::ConnectionFailed(msg)) => {
+                        println!("\r  {} {}  ", style("✗").red(), t.ssh_test_connection_failed());
+                        println!("    {}", style(&msg).dim());
+                        return Ok(());
+                    }
+                    _ => {}
+                }
+            }
+
+            // Push all local commits
+            println!("  {} {}", style("⟳").blue(), t.remote_pushing());
+            let push_result = storage::git::push(&sync_dir)?;
+            if push_result.pushed {
+                println!("  {} {}", style("✓").green(), t.synced_to_git());
+            } else if let Some(ref err) = push_result.push_error {
+                if !err.contains("up-to-date") && !err.contains("up to date") {
+                    println!("  {} {}", style("⚠").yellow(), t.push_failed(err));
+                } else {
+                    println!("  {} {}", style("✓").green(), t.all_synced());
+                }
+            }
         }
     }
 
