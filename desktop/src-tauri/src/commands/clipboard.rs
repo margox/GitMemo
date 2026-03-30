@@ -9,8 +9,8 @@ static WATCHING: AtomicBool = AtomicBool::new(false);
 /// Minimum characters to save (filter out passwords, short copies)
 const MIN_LENGTH: usize = 10;
 
-/// Interval between clipboard checks (ms) — faster for responsiveness
-const POLL_INTERVAL_MS: u64 = 500;
+/// Interval between clipboard checks (ms)
+const POLL_INTERVAL_MS: u64 = 300;
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ClipboardEvent {
@@ -76,94 +76,38 @@ pub fn save_clipboard_now(content: String) -> Result<ClipboardEvent, String> {
 }
 
 fn clipboard_poll_loop(app: AppHandle) {
-    // Initialize last_hash with current clipboard to avoid saving stale content on start
-    let mut last_hash = get_clipboard_text()
+    // Use arboard for native clipboard access (no subprocess overhead)
+    let mut clipboard = match arboard::Clipboard::new() {
+        Ok(cb) => cb,
+        Err(e) => {
+            log::error!("Failed to init clipboard: {}", e);
+            WATCHING.store(false, Ordering::SeqCst);
+            return;
+        }
+    };
+
+    // Initialize with current clipboard content hash
+    let mut last_hash = clipboard
+        .get_text()
         .ok()
         .filter(|t| !t.is_empty())
         .map(|t| content_hash(&t))
         .unwrap_or_default();
 
-    // Consecutive failure counter for backoff
-    let mut fail_count: u32 = 0;
-
-    loop {
-        if !WATCHING.load(Ordering::SeqCst) {
-            break;
-        }
-
-        match get_clipboard_text() {
-            Ok(text) => {
-                fail_count = 0; // Reset on success
-
-                if !text.is_empty() && text.len() >= MIN_LENGTH {
-                    let hash = content_hash(&text);
-                    if hash != last_hash {
-                        last_hash = hash;
-
-                        // Save and emit event
-                        if let Ok(event) = save_clip_content(&text) {
-                            let _ = app.emit("clipboard-saved", &event);
-                        }
+    while WATCHING.load(Ordering::SeqCst) {
+        if let Ok(text) = clipboard.get_text() {
+            if !text.is_empty() && text.len() >= MIN_LENGTH {
+                let hash = content_hash(&text);
+                if hash != last_hash {
+                    last_hash = hash;
+                    if let Ok(event) = save_clip_content(&text) {
+                        let _ = app.emit("clipboard-saved", &event);
                     }
-                }
-            }
-            Err(_) => {
-                fail_count = fail_count.saturating_add(1);
-                // Back off on repeated failures (max 3s)
-                if fail_count > 5 {
-                    std::thread::sleep(std::time::Duration::from_millis(3000));
-                    continue;
                 }
             }
         }
 
         std::thread::sleep(std::time::Duration::from_millis(POLL_INTERVAL_MS));
-    }
-}
-
-fn get_clipboard_text() -> Result<String, String> {
-    #[cfg(target_os = "macos")]
-    {
-        // Use pbpaste with explicit UTF-8 and timeout
-        let output = std::process::Command::new("pbpaste")
-            .env("LANG", "en_US.UTF-8")
-            .output()
-            .map_err(|e| e.to_string())?;
-
-        if !output.status.success() {
-            return Err("pbpaste failed".into());
-        }
-
-        let text = String::from_utf8_lossy(&output.stdout).to_string();
-        Ok(text)
-    }
-
-    #[cfg(target_os = "linux")]
-    {
-        let output = std::process::Command::new("xclip")
-            .args(["-selection", "clipboard", "-o"])
-            .output()
-            .map_err(|e| e.to_string())?;
-
-        if !output.status.success() {
-            return Err("xclip failed".into());
-        }
-
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
-    }
-
-    #[cfg(target_os = "windows")]
-    {
-        let output = std::process::Command::new("powershell")
-            .args(["-NoProfile", "-Command", "Get-Clipboard"])
-            .output()
-            .map_err(|e| e.to_string())?;
-
-        if !output.status.success() {
-            return Err("powershell clipboard failed".into());
-        }
-
-        Ok(String::from_utf8_lossy(&output.stdout).to_string())
     }
 }
 
@@ -218,7 +162,7 @@ fn save_clip_content(content: &str) -> Result<ClipboardEvent, String> {
 
     // Async git sync (don't block)
     let dir = sync_dir.clone();
-    let msg = format!("clip: {}", &title[..title.len().min(40)]);
+    let msg = format!("clip: {}", title.chars().take(40).collect::<String>());
     std::thread::spawn(move || {
         let _ = git::commit_and_push(&dir, &msg);
     });
