@@ -36,25 +36,44 @@ fn configured_branch(repo_path: &Path) -> String {
     "main".to_string()
 }
 
-/// Initialize or open Git repository at the given path
+/// Check if a remote is configured (non-empty remote in config.toml)
+pub fn has_remote(repo_path: &Path) -> bool {
+    let config_path = repo_path.join(".metadata").join("config.toml");
+    if let Ok(content) = std::fs::read_to_string(&config_path) {
+        if let Ok(config) = toml::from_str::<toml::Value>(&content) {
+            if let Some(remote) = config.get("git")
+                .and_then(|g| g.get("remote"))
+                .and_then(|r| r.as_str())
+            {
+                return !remote.is_empty();
+            }
+        }
+    }
+    false
+}
+
+/// Initialize or open Git repository at the given path.
+/// If remote_url is empty, creates a local-only repo (no origin).
 pub fn init_repo(repo_path: &Path, remote_url: &str) -> Result<git2::Repository> {
     let repo = if repo_path.join(".git").exists() {
-        // Open existing repo
         let repo = git2::Repository::open(repo_path)?;
-        // Update remote URL if different
-        if let Ok(remote) = repo.find_remote("origin") {
-            if remote.url().unwrap_or("") != remote_url {
-                drop(remote);
-                repo.remote_set_url("origin", remote_url)?;
+        if !remote_url.is_empty() {
+            // Update remote URL if different
+            if let Ok(remote) = repo.find_remote("origin") {
+                if remote.url().unwrap_or("") != remote_url {
+                    drop(remote);
+                    repo.remote_set_url("origin", remote_url)?;
+                }
+            } else {
+                repo.remote("origin", remote_url)?;
             }
-        } else {
-            repo.remote("origin", remote_url)?;
         }
         repo
     } else {
-        // Create new repo
         let repo = git2::Repository::init(repo_path)?;
-        repo.remote("origin", remote_url)?;
+        if !remote_url.is_empty() {
+            repo.remote("origin", remote_url)?;
+        }
         repo
     };
 
@@ -151,13 +170,16 @@ pub fn commit_and_push(repo_path: &Path, message: &str) -> Result<SyncResult> {
         true
     };
 
-    // Rebase on remote before pushing to avoid conflicts
-    let _ = pull(repo_path);
+    // Push only if remote is configured
+    if has_remote(repo_path) {
+        // Rebase on remote before pushing to avoid conflicts
+        let _ = pull(repo_path);
 
-    // Push using system git with configured branch
-    let (pushed, push_error) = do_push(repo_path);
-
-    Ok(SyncResult { committed, pushed, push_error })
+        let (pushed, push_error) = do_push(repo_path);
+        Ok(SyncResult { committed, pushed, push_error })
+    } else {
+        Ok(SyncResult { committed, pushed: false, push_error: None })
+    }
 }
 
 /// Execute git push to the configured branch and return (success, error_message)

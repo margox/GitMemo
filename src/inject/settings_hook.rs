@@ -6,6 +6,24 @@ const SOURCE_TAG: &str = "gitmemo";
 
 /// Generate the PostToolUse hook entry
 fn generate_hook(sync_dir: &str) -> Value {
+    // Read branch and remote from config.toml
+    let config_detect = format!(
+        r#"CONF=$(python3 -c "
+import sys
+try:
+    import tomllib as t
+except ImportError:
+    try:
+        import tomli as t
+    except ImportError:
+        import toml as t
+with open('{sync_dir}/.metadata/config.toml','rb') as f:
+    c=t.load(f);g=c.get('git',{{}})
+    print(g.get('branch','main'));print(g.get('remote',''))
+" 2>/dev/null || echo -e "main\n"); BRANCH=$(echo "$CONF" | head -1); REMOTE=$(echo "$CONF" | tail -1); "#,
+        sync_dir = sync_dir
+    );
+
     serde_json::json!({
         "_source": SOURCE_TAG,
         "matcher": "Write|Edit",
@@ -13,8 +31,9 @@ fn generate_hook(sync_dir: &str) -> Value {
             "type": "command",
             "async": true,
             "command": format!(
-                r#"FILE=$(cat /dev/stdin | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_input',{{}}).get('file_path',''))" 2>/dev/null); SYNC_DIR="{}"; if echo "$FILE" | grep -q "^$SYNC_DIR/"; then cd "$SYNC_DIR" && git add -A && git diff --cached --quiet || git commit -m "auto: save $(basename "$FILE")" && git push origin main 2>/dev/null; fi"#,
-                sync_dir
+                r#"FILE=$(cat /dev/stdin | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_input',{{}}).get('file_path',''))" 2>/dev/null); SYNC_DIR="{sync_dir}"; if echo "$FILE" | grep -q "^$SYNC_DIR/"; then cd "$SYNC_DIR" && {config_detect}git add -A && git diff --cached --quiet || git commit -m "auto: save $(basename "$FILE")" && if [ -n "$REMOTE" ]; then git push origin "$BRANCH" 2>/dev/null; fi; fi"#,
+                sync_dir = sync_dir,
+                config_detect = config_detect,
             )
         }]
     })

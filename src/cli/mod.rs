@@ -117,4 +117,14 @@ pub enum Commands {
         /// Branch name to set. Omit to show current branch.
         name: Option<String>,
     },
+
+    /// Show, set, or remove the remote Git repository
+    Remote {
+        /// Remote URL to set. Omit to show current remote.
+        url: Option<String>,
+
+        /// Remove remote and switch to local-only mode
+        #[arg(long)]
+        remove: bool,
+    },
 }

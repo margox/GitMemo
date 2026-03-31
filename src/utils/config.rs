@@ -16,11 +16,18 @@ fn default_lang() -> String {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct GitConfig {
+    /// Git remote URL. Empty string means local-only mode.
+    #[serde(default)]
     pub remote: String,
     pub branch: String,
 }
 
 impl Config {
+    /// Whether a remote repository is configured
+    pub fn has_remote(&self) -> bool {
+        !self.git.remote.is_empty()
+    }
+
     pub fn load(config_path: &Path) -> Result<Self> {
         let content = std::fs::read_to_string(config_path)?;
         Ok(toml::from_str(&content)?)

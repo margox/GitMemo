@@ -120,8 +120,78 @@ impl I18n {
 
     pub fn git_url_prompt(&self) -> &str {
         match self.lang {
-            Lang::En => "Git repository URL",
-            Lang::Zh => "Git 仓库地址",
+            Lang::En => "Git repository URL (Enter to skip, local-only)",
+            Lang::Zh => "Git 仓库地址（直接回车跳过，仅本地存储）",
+        }
+    }
+
+    pub fn local_mode_selected(&self) -> &str {
+        match self.lang {
+            Lang::En => "Local-only mode (no remote sync)",
+            Lang::Zh => "仅本地模式（不同步到远端）",
+        }
+    }
+
+    pub fn local_saved_hint(&self) -> &str {
+        match self.lang {
+            Lang::En => "Saved locally (run `gitmemo remote <url>` to enable sync)",
+            Lang::Zh => "已保存到本地（运行 `gitmemo remote <url>` 开启远程同步）",
+        }
+    }
+
+    pub fn sync_mode_local(&self) -> &str {
+        match self.lang {
+            Lang::En => "Sync mode: local only",
+            Lang::Zh => "同步模式: 仅本地",
+        }
+    }
+
+    pub fn remote_current(&self, url: &str) -> String {
+        match self.lang {
+            Lang::En => format!("Remote: {}", url),
+            Lang::Zh => format!("远程仓库: {}", url),
+        }
+    }
+
+    pub fn remote_none(&self) -> &str {
+        match self.lang {
+            Lang::En => "No remote configured. Run `gitmemo remote <url>` to set one.",
+            Lang::Zh => "未配置远程仓库。运行 `gitmemo remote <url>` 进行配置。",
+        }
+    }
+
+    pub fn remote_set_ok(&self) -> &str {
+        match self.lang {
+            Lang::En => "Remote configured",
+            Lang::Zh => "远程仓库已配置",
+        }
+    }
+
+    pub fn remote_pushing(&self) -> &str {
+        match self.lang {
+            Lang::En => "Pushing local commits to remote...",
+            Lang::Zh => "正在推送本地提交到远端...",
+        }
+    }
+
+    pub fn remote_removed(&self) -> &str {
+        match self.lang {
+            Lang::En => "Remote removed. Switched to local-only mode.",
+            Lang::Zh => "远程仓库已移除，已切换到仅本地模式。",
+        }
+    }
+
+    pub fn remote_same(&self, url: &str) -> String {
+        match self.lang {
+            Lang::En => format!("Remote is already set to {}", url),
+            Lang::Zh => format!("远程仓库已经是 {}", url),
+        }
+    }
+
+    pub fn opening_browser(&self) -> &str {
+        match self.lang {
+            Lang::En => "Opening Deploy Keys page in browser...",
+            Lang::Zh => "正在浏览器中打开 Deploy Keys 页面...",
         }
     }
 
@@ -150,6 +220,76 @@ impl I18n {
         match self.lang {
             Lang::En => "SSH key exists, skipped generation",
             Lang::Zh => "SSH 密钥已存在，跳过生成",
+        }
+    }
+
+    pub fn ssh_url_recommended(&self) -> &str {
+        match self.lang {
+            Lang::En => "SSH URL is recommended for automatic sync (no password needed):",
+            Lang::Zh => "推荐使用 SSH 地址进行自动同步（无需密码）：",
+        }
+    }
+
+    pub fn use_ssh_url(&self) -> &str {
+        match self.lang {
+            Lang::En => "Use SSH URL (recommended)",
+            Lang::Zh => "使用 SSH 地址（推荐）",
+        }
+    }
+
+    pub fn keep_https_url(&self) -> &str {
+        match self.lang {
+            Lang::En => "Keep HTTPS URL",
+            Lang::Zh => "保持 HTTPS 地址",
+        }
+    }
+
+    pub fn choose_url_prompt(&self) -> &str {
+        match self.lang {
+            Lang::En => "Choose URL type",
+            Lang::Zh => "选择地址类型",
+        }
+    }
+
+    pub fn testing_ssh(&self) -> &str {
+        match self.lang {
+            Lang::En => "Testing SSH connection",
+            Lang::Zh => "正在测试 SSH 连接",
+        }
+    }
+
+    pub fn ssh_test_ok(&self) -> &str {
+        match self.lang {
+            Lang::En => "SSH connection OK",
+            Lang::Zh => "SSH 连接正常",
+        }
+    }
+
+    pub fn ssh_test_auth_failed(&self) -> &str {
+        match self.lang {
+            Lang::En => "SSH authentication failed — public key not recognized",
+            Lang::Zh => "SSH 认证失败 — 公钥未被识别",
+        }
+    }
+
+    pub fn ssh_test_connection_failed(&self) -> &str {
+        match self.lang {
+            Lang::En => "SSH connection failed — cannot reach host",
+            Lang::Zh => "SSH 连接失败 — 无法访问主机",
+        }
+    }
+
+    pub fn ssh_test_unknown(&self) -> &str {
+        match self.lang {
+            Lang::En => "SSH connection status unclear, may need manual check",
+            Lang::Zh => "SSH 连接状态不确定，可能需要手动检查",
+        }
+    }
+
+    pub fn ssh_test_error(&self) -> &str {
+        match self.lang {
+            Lang::En => "SSH test error:",
+            Lang::Zh => "SSH 测试出错：",
         }
     }
 
@@ -429,13 +569,6 @@ impl I18n {
         match self.lang {
             Lang::En => "Run {} to retry push",
             Lang::Zh => "运行 {} 重试推送",
-        }
-    }
-
-    pub fn committing(&self) -> &str {
-        match self.lang {
-            Lang::En => "Committed, pushing...",
-            Lang::Zh => "已提交，推送中...",
         }
     }
 

@@ -82,6 +82,13 @@ chmod +x "${TMPFILE}"
 
 # Install
 INSTALL_DIR="/usr/local/bin"
+
+# Ensure install directory exists
+if [ ! -d "${INSTALL_DIR}" ]; then
+    echo "  Creating ${INSTALL_DIR} (requires sudo)..."
+    sudo mkdir -p "${INSTALL_DIR}"
+fi
+
 if [ -w "${INSTALL_DIR}" ]; then
     mv "${TMPFILE}" "${INSTALL_DIR}/gitmemo"
 else
