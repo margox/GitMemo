@@ -4,9 +4,20 @@ use clap::{Parser, Subcommand};
 #[command(
     name = "gitmemo",
     about = "Auto-sync your AI conversations and notes to Git",
-    version
+    version = env!("CARGO_PKG_VERSION"),
+    disable_version_flag = true
 )]
 pub struct Cli {
+    /// Print version (same as -V / --version; clap default is only -V, many users type -v)
+    #[arg(
+        short = 'v',
+        visible_short_alias = 'V',
+        long = "version",
+        global = true,
+        action = clap::ArgAction::Version
+    )]
+    _version: Option<bool>,
+
     #[command(subcommand)]
     pub command: Commands,
 }

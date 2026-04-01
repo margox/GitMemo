@@ -28,9 +28,11 @@ pub fn run() {
             notes::create_manual,
             notes::read_file,
             notes::read_file_base64,
+            notes::resolve_sync_path,
             notes::list_files,
             notes::update_note,
             notes::delete_note,
+            notes::delete_clip,
             // Search
             search::search_all,
             search::recent_conversations,

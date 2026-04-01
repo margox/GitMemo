@@ -30,7 +30,7 @@ fn generate_instruction_zh(sync_dir: &str) -> String {
 ```markdown
 ---
 title: {{对话标题}}
-date: {{YYYY-MM-DD HH:MM:SS}}
+date: {{YYYY-MM-DDTHH:MM:SS±HH:MM}}
 model: {{模型名称}}
 messages: {{消息轮次数}}
 ---
@@ -51,6 +51,10 @@ messages: {{消息轮次数}}
 - 标题从对话内容自动生成，中文不超过 20 字
 - 代码块保留原始格式和语言标记
 - 自动过滤 API Key、密码等敏感信息（替换为 `***`）
+- **时间与时区（重要，避免固定偏差例如「慢 2 小时」）**：
+  - `date` **必须**使用带显式偏移的 ISO 8601，例如 `2026-04-01T18:30:00+08:00` 或 `...Z`（仅当确为 UTC）。**禁止**再写无偏移的 `YYYY-MM-DD HH:MM:SS`（浏览器/模型常按 UTC 或歧义解析，会与用户本机钟差固定小时数）。
+  - 保存前应用**用户机器上的真实本地时间**：在终端执行 `date +"%Y-%m-%dT%H:%M:%S%z"`，把 `%z` 规范成 `+08:00` 这种冒号形式后写入 `date`；小标题里的 `HH:MM:SS` 与 frontmatter 同一天内须一致、同一时区含义。
+  - 不要用模型「以为的当前时间」当权威时钟。
 
 ## GitMemo - 自动保存独立文档
 
@@ -105,7 +109,7 @@ fn generate_instruction_en(sync_dir: &str) -> String {
 ```markdown
 ---
 title: {{conversation title}}
-date: {{YYYY-MM-DD HH:MM:SS}}
+date: {{YYYY-MM-DDTHH:MM:SS±HH:MM}}
 model: {{model name}}
 messages: {{message count}}
 ---
@@ -126,6 +130,10 @@ messages: {{message count}}
 - Auto-generate title from conversation content, max 60 characters
 - Preserve original format and language tags for code blocks
 - Auto-filter API Keys, passwords and other sensitive info (replace with `***`)
+- **Time & timezone (prevents systematic skew like “2 hours late”)**:
+  - `date` **must** be ISO 8601 **with an explicit offset**, e.g. `2026-04-01T18:30:00+02:00` or `...Z` only if truly UTC. **Do not** use bare `YYYY-MM-DD HH:MM:SS` without offset (ambiguous; often interpreted as UTC or inconsistently vs the user’s machine).
+  - Before saving, take wall time from the **user’s environment**: run `date +"%Y-%m-%dT%H:%M:%S%z"` in the terminal and normalize `%z` to `±HH:MM` for the `date` field; `HH:MM:SS` in headings must match the same local calendar day and timezone intent.
+  - Do not trust the model’s internal notion of “now” as the source of truth.
 
 ## GitMemo - Auto-save Standalone Documents
 

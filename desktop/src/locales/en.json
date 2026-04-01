@@ -82,7 +82,10 @@
     "saved": "Saved!",
     "copied": "Copied",
     "copy": "Copy",
-    "clipsTotal": "{0} clips total"
+    "clipsTotal": "{0} clips total",
+    "deleteConfirm": "Delete this clip from saved history?",
+    "deleteClip": "Delete",
+    "clipDeleted": "Clip deleted"
   },
   "search": {
     "placeholder": "Search conversations, notes, clips... (Cmd+K)",
@@ -135,7 +138,9 @@
     "stop": "Stop",
     "delete": "Delete",
     "cancel": "Cancel",
-    "confirm": "Confirm"
+    "confirm": "Confirm",
+    "copyPath": "Copy full path on this device",
+    "pathCopied": "Path copied"
   },
   "claudeConfig": {
     "memory": "Memory",

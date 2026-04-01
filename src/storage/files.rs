@@ -16,11 +16,17 @@ pub fn create_directory_structure(base: &Path) -> Result<()> {
         "notes/daily",
         "notes/manual",
         "notes/scratch",
+        "Doc/会话记录",
         ".metadata",
     ];
 
     for dir in &dirs {
         std::fs::create_dir_all(base.join(dir))?;
+    }
+
+    let session_gitkeep = base.join("Doc/会话记录/.gitkeep");
+    if !session_gitkeep.exists() {
+        std::fs::write(&session_gitkeep, "")?;
     }
 
     // Create .gitignore

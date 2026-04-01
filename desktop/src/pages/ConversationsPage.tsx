@@ -3,7 +3,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { MessageSquare, Trash2, ChevronLeft } from "lucide-react";
 import MarkdownView from "../components/MarkdownView";
+import { CopyPathButton } from "../components/CopyPathButton";
 import { useResizablePanel } from "../hooks/useResizablePanel";
+import { useRelativeTimeTick } from "../hooks/useRelativeTimeTick";
 import { relativeTime } from "../utils/time";
 import { useI18n } from "../hooks/useI18n";
 import { useToast } from "../hooks/useToast";
@@ -84,6 +86,7 @@ function parseMessages(body: string): ChatMessage[] {
 export default function ConversationsPage({ onFocusSidebar, enterTrigger, sidebarFocused }: { onFocusSidebar?: () => void; enterTrigger?: number; sidebarFocused?: boolean }) {
   const { t } = useI18n();
   const { showToast } = useToast();
+  useRelativeTimeTick();
   const panel = useResizablePanel("conversations", 300);
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [metaCache, setMetaCache] = useState<Map<string, ConversationMeta>>(new Map());
@@ -197,16 +200,6 @@ export default function ConversationsPage({ onFocusSidebar, enterTrigger, sideba
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [navigatePrev, navigateNext, selectedFile, files, sidebarFocused]);
-
-  const formatDate = (dateStr: string) => {
-    if (!dateStr) return "";
-    try {
-      const d = new Date(dateStr.replace(" ", "T"));
-      return d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    } catch {
-      return dateStr.slice(0, 10);
-    }
-  };
 
   return (
     <div style={{ display: "flex", height: "100%" }}>
@@ -336,6 +329,7 @@ export default function ConversationsPage({ onFocusSidebar, enterTrigger, sideba
                   {currentMeta.messages} {t("conversations.msgs")}
                 </span>
               )}
+              {selectedFile ? <CopyPathButton relPath={selectedFile} /> : null}
               <button
                 onClick={handleDelete}
                 style={{

@@ -2,7 +2,9 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Brain, Wrench, FileText, ChevronLeft } from "lucide-react";
 import MarkdownView from "../components/MarkdownView";
+import { CopyPathButton } from "../components/CopyPathButton";
 import { useResizablePanel } from "../hooks/useResizablePanel";
+import { useRelativeTimeTick } from "../hooks/useRelativeTimeTick";
 import { relativeTime } from "../utils/time";
 import { useI18n } from "../hooks/useI18n";
 
@@ -25,6 +27,7 @@ const tabs: { id: Tab; labelKey: string; folder: string; icon: typeof Brain }[] 
 
 export default function ClaudeConfigPage({ onFocusSidebar: _onFocusSidebar, enterTrigger: _enterTrigger }: { onFocusSidebar?: () => void; enterTrigger?: number } = {}) {
   const { t } = useI18n();
+  useRelativeTimeTick();
   const panel = useResizablePanel("claude-config", 300);
   const [activeTab, setActiveTab] = useState<Tab>("memory");
   const [files, setFiles] = useState<FileEntry[]>([]);
@@ -215,6 +218,7 @@ export default function ClaudeConfigPage({ onFocusSidebar: _onFocusSidebar, ente
               <span style={{ flex: 1, fontSize: 12, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {selectedFile}
               </span>
+              {selectedFile ? <CopyPathButton relPath={selectedFile} /> : null}
             </div>
             <div style={{ flex: 1, overflowY: "auto", padding: "20px 28px", userSelect: "text" }}>
               <MarkdownView content={fileContent} filePath={selectedFile ?? undefined} />

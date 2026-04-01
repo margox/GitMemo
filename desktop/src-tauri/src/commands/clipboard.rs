@@ -2,6 +2,8 @@ use gitmemo_core::storage::{files, git};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::sync::atomic::{AtomicBool, Ordering};
+#[cfg(target_os = "macos")]
+use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 
 static WATCHING: AtomicBool = AtomicBool::new(false);
@@ -75,57 +77,163 @@ pub fn save_clipboard_now(content: String) -> Result<ClipboardEvent, String> {
     save_clip_content(&content)
 }
 
+/// Work collected on the main thread (macOS); saving runs on the poll thread afterward.
+enum PendingClip {
+    Text(String),
+    Image {
+        width: usize,
+        height: usize,
+        bytes: Vec<u8>,
+    },
+}
+
+/// True when plain-text clipboard is the same image also exposed as raster (Safari/Chrome often set both).
+/// Saving both caused a loop: text branch cleared `last_image_hash`, image branch cleared `last_text_hash`, repeat.
+fn is_redundant_image_data_url(text: &str) -> bool {
+    let t = text.trim_start();
+    t.starts_with("data:image/") && t.contains(";base64,")
+}
+
+/// One poll cycle: read clipboard and detect changes; does not touch disk.
+fn collect_pending_clips(
+    clipboard: &mut arboard::Clipboard,
+    last_text_hash: &mut String,
+    last_image_hash: &mut String,
+) -> Vec<PendingClip> {
+    let mut pending = Vec::new();
+
+    let img_result = clipboard.get_image();
+    let has_raster_image = matches!(
+        &img_result,
+        Ok(img) if img.width > 0 && img.height > 0
+    );
+
+    if let Ok(text) = clipboard.get_text() {
+        if !text.is_empty() && text.len() >= MIN_LENGTH {
+            let hash = content_hash(&text);
+            if hash != *last_text_hash {
+                if has_raster_image && is_redundant_image_data_url(&text) {
+                    // Same copy as `get_image()`; record hash only so we don't re-trigger forever.
+                    *last_text_hash = hash;
+                } else {
+                    *last_text_hash = hash;
+                    pending.push(PendingClip::Text(text));
+                }
+            }
+        }
+    }
+
+    if let Ok(img) = img_result {
+        if img.width > 0 && img.height > 0 {
+            let hash = image_hash(&img);
+            if hash != *last_image_hash {
+                *last_image_hash = hash;
+                pending.push(PendingClip::Image {
+                    width: img.width,
+                    height: img.height,
+                    bytes: img.bytes.to_vec(),
+                });
+            }
+        }
+    }
+
+    pending
+}
+
+fn flush_pending_clips(pending: Vec<PendingClip>) -> Vec<ClipboardEvent> {
+    let mut events = Vec::new();
+    for item in pending {
+        match item {
+            PendingClip::Text(text) => {
+                if let Ok(event) = save_clip_content(&text) {
+                    events.push(event);
+                }
+            }
+            PendingClip::Image {
+                width,
+                height,
+                bytes,
+            } => match save_clip_image_from_rgba(width, height, bytes) {
+                Ok(event) => events.push(event),
+                Err(e) => log::warn!("clipboard image save skipped: {}", e),
+            },
+        }
+    }
+    events
+}
+
 fn clipboard_poll_loop(app: AppHandle) {
-    // Use arboard for native clipboard access (no subprocess overhead)
-    let mut clipboard = match arboard::Clipboard::new() {
-        Ok(cb) => cb,
-        Err(e) => {
-            log::error!("Failed to init clipboard: {}", e);
-            WATCHING.store(false, Ordering::SeqCst);
-            return;
-        }
-    };
-
-    // Initialize with current clipboard content hash
-    let mut last_hash = clipboard
-        .get_text()
-        .ok()
-        .filter(|t| !t.is_empty())
-        .map(|t| content_hash(&t))
-        .unwrap_or_default();
-
-    let mut last_image_hash = String::new();
-
-    while WATCHING.load(Ordering::SeqCst) {
-        // Check for text
-        if let Ok(text) = clipboard.get_text() {
-            if !text.is_empty() && text.len() >= MIN_LENGTH {
-                let hash = content_hash(&text);
-                if hash != last_hash {
-                    last_hash = hash;
-                    last_image_hash.clear();
-                    if let Ok(event) = save_clip_content(&text) {
-                        let _ = app.emit("clipboard-saved", &event);
-                    }
+    // macOS: NSPasteboard + TIFF/ImageIO are unsafe from background threads (SIGBUS / crashes).
+    #[cfg(target_os = "macos")]
+    {
+        let state = Arc::new(Mutex::new((String::new(), String::new())));
+        // Match non-macOS: seed text hash from current clipboard so we don't save pre-existing text once.
+        dispatch2::run_on_main(|_mtm| {
+            let mut guard = state.lock().unwrap_or_else(|e| e.into_inner());
+            let (ref mut last_text_hash, _) = *guard;
+            let mut clipboard = match arboard::Clipboard::new() {
+                Ok(cb) => cb,
+                Err(e) => {
+                    log::error!("Failed to init clipboard: {}", e);
+                    return;
+                }
+            };
+            if let Ok(t) = clipboard.get_text() {
+                if !t.is_empty() {
+                    *last_text_hash = content_hash(&t);
                 }
             }
-        }
-
-        // Check for image
-        if let Ok(img) = clipboard.get_image() {
-            if img.width > 0 && img.height > 0 {
-                let hash = image_hash(&img);
-                if hash != last_image_hash {
-                    last_image_hash = hash;
-                    last_hash.clear();
-                    if let Ok(event) = save_clip_image(&img) {
-                        let _ = app.emit("clipboard-saved", &event);
+        });
+        while WATCHING.load(Ordering::SeqCst) {
+            let state_c = Arc::clone(&state);
+            let events = dispatch2::run_on_main(move |_mtm| {
+                let mut guard = state_c.lock().unwrap_or_else(|e| e.into_inner());
+                let (ref mut last_text_hash, ref mut last_image_hash) = *guard;
+                let mut clipboard = match arboard::Clipboard::new() {
+                    Ok(cb) => cb,
+                    Err(e) => {
+                        log::error!("Failed to init clipboard: {}", e);
+                        return Vec::new();
                     }
-                }
+                };
+                collect_pending_clips(&mut clipboard, last_text_hash, last_image_hash)
+            });
+            let events = flush_pending_clips(events);
+            for event in events {
+                let _ = app.emit("clipboard-saved", &event);
             }
+            std::thread::sleep(std::time::Duration::from_millis(POLL_INTERVAL_MS));
         }
+        return;
+    }
 
-        std::thread::sleep(std::time::Duration::from_millis(POLL_INTERVAL_MS));
+    #[cfg(not(target_os = "macos"))]
+    {
+        let mut clipboard = match arboard::Clipboard::new() {
+            Ok(cb) => cb,
+            Err(e) => {
+                log::error!("Failed to init clipboard: {}", e);
+                WATCHING.store(false, Ordering::SeqCst);
+                return;
+            }
+        };
+
+        let mut last_text_hash = clipboard
+            .get_text()
+            .ok()
+            .filter(|t| !t.is_empty())
+            .map(|t| content_hash(&t))
+            .unwrap_or_default();
+
+        let mut last_image_hash = String::new();
+
+        while WATCHING.load(Ordering::SeqCst) {
+            let pending = collect_pending_clips(&mut clipboard, &mut last_text_hash, &mut last_image_hash);
+            for event in flush_pending_clips(pending) {
+                let _ = app.emit("clipboard-saved", &event);
+            }
+            std::thread::sleep(std::time::Duration::from_millis(POLL_INTERVAL_MS));
+        }
     }
 }
 
@@ -215,11 +323,49 @@ fn image_hash(img: &arboard::ImageData) -> String {
     format!("{:x}", hasher.finalize())
 }
 
-fn save_clip_image(img: &arboard::ImageData) -> Result<ClipboardEvent, String> {
+/// Hard cap to avoid OOM / WebView issues when pasting huge screenshots.
+const MAX_CLIPBOARD_IMAGE_PIXELS: u64 = 25_000_000;
+
+fn save_clip_image_from_rgba(
+    width: usize,
+    height: usize,
+    bytes: Vec<u8>,
+) -> Result<ClipboardEvent, String> {
     let sync_dir = files::sync_dir();
     if !sync_dir.exists() {
         return Err("GitMemo not initialized".into());
     }
+
+    let w = width as u64;
+    let h = height as u64;
+    let pixels = w.checked_mul(h).ok_or("Invalid image dimensions")?;
+    if pixels == 0 {
+        return Err("Empty image".into());
+    }
+    if pixels > MAX_CLIPBOARD_IMAGE_PIXELS {
+        return Err(format!(
+            "Image too large ({}×{}), max {} pixels",
+            width,
+            height,
+            MAX_CLIPBOARD_IMAGE_PIXELS
+        ));
+    }
+
+    let expected_len = (pixels as usize)
+        .checked_mul(4)
+        .ok_or("Image buffer size overflow")?;
+    if bytes.len() != expected_len {
+        return Err(format!(
+            "Bad RGBA size: got {} bytes, need {} for {}×{}",
+            bytes.len(),
+            expected_len,
+            width,
+            height
+        ));
+    }
+
+    let w32 = u32::try_from(width).map_err(|_| "Width too large")?;
+    let h32 = u32::try_from(height).map_err(|_| "Height too large")?;
 
     let now = chrono::Local::now();
     let date_str = now.format("%Y-%m-%d").to_string();
@@ -233,8 +379,7 @@ fn save_clip_image(img: &arboard::ImageData) -> Result<ClipboardEvent, String> {
     let png_path = clips_dir.join(&png_filename);
 
     let img_buf: image::ImageBuffer<image::Rgba<u8>, Vec<u8>> =
-        image::ImageBuffer::from_raw(img.width as u32, img.height as u32, img.bytes.to_vec())
-            .ok_or("Failed to create image buffer")?;
+        image::ImageBuffer::from_raw(w32, h32, bytes).ok_or("Failed to create image buffer")?;
 
     img_buf
         .save_with_format(&png_path, image::ImageFormat::Png)
@@ -248,8 +393,8 @@ fn save_clip_image(img: &arboard::ImageData) -> Result<ClipboardEvent, String> {
     let md = format!(
         "---\ndate: {}\nsource: clipboard-image\nwidth: {}\nheight: {}\n---\n\n![screenshot]({})\n",
         now.format("%Y-%m-%d %H:%M:%S"),
-        img.width,
-        img.height,
+        width,
+        height,
         png_filename
     );
     std::fs::write(&md_path, &md).map_err(|e| e.to_string())?;
@@ -260,7 +405,7 @@ fn save_clip_image(img: &arboard::ImageData) -> Result<ClipboardEvent, String> {
         let _ = git::commit_and_push(&dir, "clip: screenshot");
     });
 
-    let preview = format!("Screenshot {}x{}", img.width, img.height);
+    let preview = format!("Screenshot {}x{}", width, height);
 
     Ok(ClipboardEvent {
         saved: true,

@@ -1,6 +1,6 @@
 use gitmemo_core::storage::{files, git};
 use serde::Serialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use tauri::{AppHandle, Emitter};
 
@@ -31,6 +31,49 @@ pub struct FileEntry {
     pub preview: String,
     #[serde(rename = "modifiedTs")]
     pub modified_ts: i64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub preview_image: Option<String>,
+}
+
+fn frontmatter_value<'a>(content: &'a str, key: &str) -> Option<&'a str> {
+    if !content.starts_with("---") {
+        return None;
+    }
+    let rest = &content[3..];
+    let end = rest.find("---")?;
+    let fm = &rest[..end];
+    let prefix = format!("{}:", key);
+    for line in fm.lines() {
+        let line = line.trim();
+        if let Some(v) = line.strip_prefix(&prefix) {
+            return Some(v.trim());
+        }
+    }
+    None
+}
+
+fn extract_markdown_image_path(body: &str) -> Option<String> {
+    let idx = body.find("![")?;
+    let after = &body[idx + 2..];
+    let rbrack = after.find(']')?;
+    if !after[rbrack + 1..].starts_with('(') {
+        return None;
+    }
+    let path_start = rbrack + 2;
+    let path_rest = &after[path_start..];
+    let rparen = path_rest.find(')')?;
+    Some(path_rest[..rparen].to_string())
+}
+
+fn preview_from_body(body: &str) -> String {
+    body.lines()
+        .filter(|l| !l.starts_with('#') && !l.trim().is_empty())
+        .take(3)
+        .collect::<Vec<_>>()
+        .join("\n")
+        .chars()
+        .take(200)
+        .collect::<String>()
 }
 
 /// Spawn git commit+push in background so the UI isn't blocked.
@@ -123,6 +166,23 @@ pub fn read_file_base64(file_path: String) -> Result<String, String> {
     Ok(base64::engine::general_purpose::STANDARD.encode(&buf))
 }
 
+/// Absolute path to a file under the GitMemo sync directory (for copy / display).
+#[tauri::command]
+pub fn resolve_sync_path(rel_path: String) -> Result<String, String> {
+    let base = sync_dir();
+    let base = base.canonicalize().map_err(|e| e.to_string())?;
+    let rel = rel_path.trim().trim_start_matches('/');
+    if rel.contains("..") {
+        return Err("Invalid path".into());
+    }
+    let full = base.join(rel);
+    let full = full.canonicalize().map_err(|e| e.to_string())?;
+    if !full.starts_with(&base) {
+        return Err("Invalid path".into());
+    }
+    Ok(full.to_string_lossy().to_string())
+}
+
 #[tauri::command]
 pub fn list_files(folder: String) -> Result<Vec<FileEntry>, String> {
     let dir = sync_dir();
@@ -157,15 +217,25 @@ pub fn list_files(folder: String) -> Result<Vec<FileEntry>, String> {
         } else {
             content.as_str()
         };
-        let preview = body
-            .lines()
-            .filter(|l| !l.starts_with('#') && !l.trim().is_empty())
-            .take(3)
-            .collect::<Vec<_>>()
-            .join("\n")
-            .chars()
-            .take(200)
-            .collect::<String>();
+
+        let is_clipboard_image = frontmatter_value(&content, "source") == Some("clipboard-image");
+        let (preview, preview_image) = if is_clipboard_image {
+            if let Some(img_file) = extract_markdown_image_path(body) {
+                let parent = Path::new(&rel_path)
+                    .parent()
+                    .map(|p| p.to_string_lossy().to_string())
+                    .filter(|s| !s.is_empty());
+                let img_rel = match parent {
+                    Some(p) => format!("{}/{}", p, img_file),
+                    None => img_file,
+                };
+                (String::new(), Some(img_rel.replace('\\', "/")))
+            } else {
+                (preview_from_body(body), None)
+            }
+        } else {
+            (preview_from_body(body), None)
+        };
 
         let name = content
             .lines()
@@ -195,6 +265,8 @@ pub fn list_files(folder: String) -> Result<Vec<FileEntry>, String> {
 
         let source_type = if rel_path.starts_with("conversations") {
             "conversation"
+        } else if rel_path.starts_with("clips") {
+            "clip"
         } else {
             "note"
         };
@@ -207,6 +279,7 @@ pub fn list_files(folder: String) -> Result<Vec<FileEntry>, String> {
             size,
             preview,
             modified_ts,
+            preview_image,
         });
     }
 
@@ -249,6 +322,57 @@ pub fn delete_note(file_path: String) -> Result<NoteResult, String> {
         success: true,
         path: file_path,
         message: "Note deleted".into(),
+    })
+}
+
+#[tauri::command]
+pub fn delete_clip(file_path: String) -> Result<NoteResult, String> {
+    let dir = sync_dir();
+    let norm = file_path
+        .replace('\\', "/")
+        .trim_start_matches('/')
+        .to_string();
+    if !norm.starts_with("clips/") || norm.contains("..") {
+        return Err("Invalid clip path".into());
+    }
+    if !norm.ends_with(".md") {
+        return Err("Invalid clip path".into());
+    }
+
+    let full_path = dir.join(&norm);
+    if !full_path.is_file() {
+        return Err(format!("File not found: {}", file_path));
+    }
+
+    if let Ok(content) = std::fs::read_to_string(&full_path) {
+        if frontmatter_value(&content, "source") == Some("clipboard-image") {
+            let body = if content.starts_with("---") {
+                if let Some(end) = content[3..].find("---") {
+                    content[3 + end + 3..].trim_start()
+                } else {
+                    content.as_str()
+                }
+            } else {
+                content.as_str()
+            };
+            if let Some(img_name) = extract_markdown_image_path(body) {
+                if !img_name.contains("..") && !img_name.contains('/') {
+                    let png_path = full_path.parent().unwrap_or(&dir).join(&img_name);
+                    if png_path.is_file() {
+                        let _ = std::fs::remove_file(&png_path);
+                    }
+                }
+            }
+        }
+    }
+
+    std::fs::remove_file(&full_path).map_err(|e| e.to_string())?;
+    bg_commit_and_push(format!("delete clip: {}", norm));
+
+    Ok(NoteResult {
+        success: true,
+        path: norm,
+        message: "Clip deleted".into(),
     })
 }
 

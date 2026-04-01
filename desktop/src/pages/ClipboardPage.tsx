@@ -1,10 +1,13 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
+import { ask } from "@tauri-apps/plugin-dialog";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { Clipboard, Play, Square, Save, Copy, Check, ChevronLeft } from "lucide-react";
+import { Clipboard, Play, Square, Save, Copy, Check, ChevronLeft, Trash2 } from "lucide-react";
 import MarkdownView from "../components/MarkdownView";
+import { CopyPathButton } from "../components/CopyPathButton";
 import { useResizablePanel } from "../hooks/useResizablePanel";
+import { useRelativeTimeTick } from "../hooks/useRelativeTimeTick";
 import { relativeTime } from "../utils/time";
 import { useI18n } from "../hooks/useI18n";
 import { useToast } from "../hooks/useToast";
@@ -29,11 +32,54 @@ interface FileEntry {
   modified: string;
   size: number;
   preview: string;
+  preview_image?: string | null;
+}
+
+interface NoteResult {
+  success: boolean;
+  path: string;
+  message: string;
+}
+
+function ClipImageThumb({ relPath, selected }: { relPath: string; selected: boolean }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    invoke<string>("read_file_base64", { filePath: relPath })
+      .then((b64) => {
+        if (cancelled) return;
+        const ext = relPath.split(".").pop()?.toLowerCase() || "png";
+        const mime = ext === "jpg" || ext === "jpeg" ? "image/jpeg" : `image/${ext}`;
+        setSrc(`data:${mime};base64,${b64}`);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [relPath]);
+  if (!src) {
+    return (
+      <div style={{ width: 56, height: 40, flexShrink: 0, borderRadius: 4, background: "var(--bg-hover)" }} />
+    );
+  }
+  return (
+    <img
+      src={src}
+      alt=""
+      style={{
+        width: 56,
+        height: 40,
+        objectFit: "cover",
+        borderRadius: 4,
+        flexShrink: 0,
+        border: `1px solid ${selected ? "rgba(255,255,255,0.35)" : "var(--border)"}`,
+      }}
+    />
+  );
 }
 
 export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTrigger: _enterTrigger }: { onFocusSidebar?: () => void; enterTrigger?: number } = {}) {
   const { t } = useI18n();
   const { showToast } = useToast();
+  useRelativeTimeTick();
   const panel = useResizablePanel("clipboard", 340);
   const [status, setStatus] = useState<ClipboardStatus | null>(null);
   const [savedClips, setSavedClips] = useState<FileEntry[]>([]);
@@ -135,24 +181,22 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
     }
   };
 
-  const copyClip = async (path: string, id: string) => {
+  const confirmDeleteClip = async (path: string) => {
+    const ok = await ask(t("clipboard.deleteConfirm"), { title: t("common.confirm"), kind: "warning" });
+    if (!ok) return;
     try {
-      const content = await invoke<string>("read_file", { filePath: path });
-      const body = content.replace(/^---[\s\S]*?---\s*/, "").trim();
-      const wasWatching = status?.watching;
-      if (wasWatching) await invoke<string>("stop_clipboard_watch");
-      await writeText(body);
-      if (wasWatching) {
-        await new Promise((r) => setTimeout(r, 200));
-        await invoke<string>("start_clipboard_watch");
+      await invoke<NoteResult>("delete_clip", { filePath: path });
+      showToast(t("clipboard.clipDeleted"));
+      if (selectedFile === path) {
+        setSelectedFile(null);
+        setFileContent("");
       }
-      setCopiedId(id);
-      setTimeout(() => setCopiedId(null), 1500);
+      loadSavedClips();
+      loadStatus();
     } catch (e) {
-      showToast(`Copy failed: ${e}`);
+      showToast(String(e));
     }
   };
-
 
   return (
     <div style={{ display: "flex", height: "100%" }}>
@@ -210,29 +254,64 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
             savedClips.map((file) => {
               const selected = selectedFile === file.path;
               return (
-                <button
+                <div
                   key={file.path}
-                  ref={(el) => { if (el) itemRefs.current.set(file.path, el); else itemRefs.current.delete(file.path); }}
-                  onClick={() => openFile(file.path)}
                   style={{
-                    display: "block", width: "100%", textAlign: "left",
-                    padding: "12px 16px", cursor: "pointer",
+                    display: "flex", alignItems: "stretch",
+                    borderBottom: "1px solid var(--border)",
                     background: selected ? "var(--accent)" : "transparent",
-                    border: "none", borderBottom: "1px solid var(--border)",
-                    color: selected ? "#fff" : "var(--text)", transition: "background 0.15s",
+                    transition: "background 0.15s",
                   }}
                 >
-                  <p style={{
-                    fontSize: 13, marginBottom: 6, whiteSpace: "pre-wrap",
-                    display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
-                    overflow: "hidden", lineHeight: 1.4, wordBreak: "break-all",
-                  }}>
-                    {file.preview || file.name}
-                  </p>
-                  <span style={{ fontSize: 11, color: selected ? "rgba(255,255,255,0.7)" : "var(--text-secondary)" }}>
-                    {relativeTime(file.modified, t)}
-                  </span>
-                </button>
+                  <button
+                    ref={(el) => { if (el) itemRefs.current.set(file.path, el); else itemRefs.current.delete(file.path); }}
+                    type="button"
+                    onClick={() => openFile(file.path)}
+                    style={{
+                      flex: 1, minWidth: 0, textAlign: "left",
+                      padding: "12px 16px", cursor: "pointer",
+                      border: "none",
+                      background: "transparent",
+                      color: selected ? "#fff" : "var(--text)",
+                    }}
+                  >
+                    <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+                      {file.preview_image ? (
+                        <ClipImageThumb relPath={file.preview_image} selected={selected} />
+                      ) : null}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <p style={{
+                          fontSize: 13, marginBottom: 6, whiteSpace: "pre-wrap",
+                          display: "-webkit-box", WebkitLineClamp: 2, WebkitBoxOrient: "vertical",
+                          overflow: "hidden", lineHeight: 1.4, wordBreak: "break-all",
+                        }}>
+                          {file.preview || file.name}
+                        </p>
+                        <span style={{ fontSize: 11, color: selected ? "rgba(255,255,255,0.7)" : "var(--text-secondary)" }}>
+                          {relativeTime(file.modified, t)}
+                        </span>
+                      </div>
+                    </div>
+                  </button>
+                  <button
+                    type="button"
+                    title={t("clipboard.deleteClip")}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      void confirmDeleteClip(file.path);
+                    }}
+                    style={{
+                      flexShrink: 0, padding: "12px 14px", cursor: "pointer",
+                      border: "none", background: "transparent",
+                      color: selected ? "rgba(255,255,255,0.85)" : "var(--text-secondary)",
+                      alignSelf: "stretch",
+                      display: "flex", alignItems: "center",
+                    }}
+                  >
+                    <Trash2 size={16} />
+                  </button>
+                </div>
               );
             })
           )}
@@ -277,7 +356,22 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
               <span style={{ flex: 1, fontSize: 12, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {selectedFile}
               </span>
+              {selectedFile ? <CopyPathButton relPath={selectedFile} /> : null}
               <button
+                type="button"
+                title={t("clipboard.deleteClip")}
+                onClick={() => { if (selectedFile) void confirmDeleteClip(selectedFile); }}
+                style={{
+                  display: "flex", alignItems: "center", gap: 4, padding: "5px 10px",
+                  borderRadius: 6, fontSize: 12, cursor: "pointer",
+                  background: "var(--bg)", border: "1px solid var(--border)",
+                  color: "var(--red)",
+                }}
+              >
+                <Trash2 size={12} />
+              </button>
+              <button
+                type="button"
                 onClick={() => copyContent(fileContent)}
                 style={{
                   display: "flex", alignItems: "center", gap: 4, padding: "5px 12px",

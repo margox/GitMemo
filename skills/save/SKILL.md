@@ -16,7 +16,7 @@ Save the current conversation as a Markdown file in the GitMemo repository.
 ```markdown
 ---
 title: {conversation title}
-date: {YYYY-MM-DD HH:MM:SS}
+date: {YYYY-MM-DDTHH:MM:SS±HH:MM}
 model: {model name}
 messages: {message count}
 ---
@@ -29,6 +29,8 @@ messages: {message count}
 ### Assistant (HH:MM:SS)
 {assistant response}
 ```
+
+**Time**: `date` must include an explicit timezone offset (ISO 8601), e.g. `2026-04-01T18:30:00+08:00`. Before writing, run `date +"%Y-%m-%dT%H:%M:%S%z"` on the user’s machine and normalize `%z` to `±HH:MM`. Do **not** use bare `YYYY-MM-DD HH:MM:SS` (ambiguous; often wrong vs local clock by a fixed number of hours). Match heading `HH:MM:SS` to the same local time intent as frontmatter `date`.
 
 4. Include ALL messages from the current conversation
 5. Preserve code blocks with original language tags

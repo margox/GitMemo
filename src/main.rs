@@ -282,6 +282,7 @@ fn cmd_init(git_url: Option<String>, path: Option<String>, no_mcp: bool, editor:
         (&claude_md_path, "CLAUDE.md.backup"),
         (&settings_path, "settings.json.backup"),
         (&claude_json_path, "claude.json.backup"),
+        (&cursor_rules_path, "gitmemo.mdc.backup"),
         (&cursor_mcp_path, "cursor-mcp.json.backup"),
     ] {
         if src.exists() {
@@ -289,6 +290,34 @@ fn cmd_init(git_url: Option<String>, path: Option<String>, no_mcp: bool, editor:
         }
     }
     println!("  {} {}", style("✓").green(), t.configs_backed_up());
+
+    // 7a. Global Cursor rules + /save skill (~/.cursor/...) — always, so Cursor picks up GitMemo without re-running init
+    inject::cursor_rules::inject(&cursor_rules_path, &sync_dir_str, lang)?;
+    println!("  {} {}", style("✓").green(), t.cursor_rules_injected());
+
+    let cursor_save_skill_dir = dirs::home_dir()
+        .unwrap()
+        .join(".cursor")
+        .join("skills")
+        .join("save");
+    std::fs::create_dir_all(&cursor_save_skill_dir)?;
+    std::fs::write(
+        cursor_save_skill_dir.join("SKILL.md"),
+        include_str!("../skills/save/SKILL.md"),
+    )?;
+    println!("  {} {}", style("✓").green(), t.cursor_save_skill_installed());
+
+    let cursor_session_log_dir = dirs::home_dir()
+        .unwrap()
+        .join(".cursor")
+        .join("skills")
+        .join("gitmemo-session-log");
+    inject::session_log_skill::install(&cursor_session_log_dir, &sync_dir_str, lang)?;
+    println!(
+        "  {} {}",
+        style("✓").green(),
+        t.cursor_session_log_skill_installed()
+    );
 
     // 7. Inject editor-specific configs
     if install_claude {
@@ -312,17 +341,24 @@ fn cmd_init(git_url: Option<String>, path: Option<String>, no_mcp: bool, editor:
             include_str!("../skills/save/SKILL.md"),
         )?;
         println!("  {} {}", style("✓").green(), t.save_skill_installed());
+
+        let claude_session_log_dir = dirs::home_dir()
+            .unwrap()
+            .join(".claude")
+            .join("skills")
+            .join("gitmemo-session-log");
+        inject::session_log_skill::install(&claude_session_log_dir, &sync_dir_str, lang)?;
+        println!(
+            "  {} {}",
+            style("✓").green(),
+            t.claude_session_log_skill_installed()
+        );
     }
 
-    if install_cursor {
-        inject::cursor_rules::inject(&cursor_rules_path, &sync_dir_str)?;
-        println!("  {} {}", style("✓").green(), t.cursor_rules_injected());
-
-        if !no_mcp {
-            let binary = std::env::current_exe()?.to_string_lossy().to_string();
-            inject::cursor_mcp::register(&cursor_mcp_path, &binary)?;
-            println!("  {} {}", style("✓").green(), t.cursor_mcp_registered());
-        }
+    if install_cursor && !no_mcp {
+        let binary = std::env::current_exe()?.to_string_lossy().to_string();
+        inject::cursor_mcp::register(&cursor_mcp_path, &binary)?;
+        println!("  {} {}", style("✓").green(), t.cursor_mcp_registered());
     }
 
     // 8. Detect remote default branch (or default to "main") and save config
@@ -418,10 +454,12 @@ fn cmd_init(git_url: Option<String>, path: Option<String>, no_mcp: bool, editor:
         println!("    1. {}", step1);
         println!("    2. {}", t.claude_next_step_2());
     }
+    let cursor_step1 = t
+        .cursor_next_step_1()
+        .replace("{}", &style(t.recommend()).bold().to_string());
+    println!("    {} {}", style("Cursor").cyan(), cursor_step1);
     if install_cursor {
-        let step1 = t.cursor_next_step_1().replace("{}", &style(t.recommend()).bold().to_string());
-        println!("    1. {}", step1);
-        println!("    2. {}", t.cursor_next_step_2());
+        println!("    {} {}", style("Cursor").cyan(), t.cursor_next_step_2());
     }
     println!();
     println!("  {}", t.verify_heading());
@@ -460,6 +498,20 @@ fn cmd_uninstall(remove_data: bool) -> Result<()> {
         println!("  {} {}", style("✓").green(), t.save_skill_removed());
     }
 
+    let claude_session_log_dir = dirs::home_dir()
+        .unwrap()
+        .join(".claude")
+        .join("skills")
+        .join("gitmemo-session-log");
+    if claude_session_log_dir.exists() {
+        std::fs::remove_dir_all(&claude_session_log_dir)?;
+        println!(
+            "  {} {}",
+            style("✓").green(),
+            t.claude_session_log_skill_removed()
+        );
+    }
+
     // Remove Cursor configs
     let cursor_rules_path = dirs::home_dir()
         .unwrap()
@@ -468,6 +520,30 @@ fn cmd_uninstall(remove_data: bool) -> Result<()> {
         .join("gitmemo.mdc");
     inject::cursor_rules::remove(&cursor_rules_path)?;
     println!("  {} {}", style("✓").green(), t.cursor_rules_removed());
+
+    let cursor_save_skill_dir = dirs::home_dir()
+        .unwrap()
+        .join(".cursor")
+        .join("skills")
+        .join("save");
+    if cursor_save_skill_dir.exists() {
+        std::fs::remove_dir_all(&cursor_save_skill_dir)?;
+        println!("  {} {}", style("✓").green(), t.cursor_save_skill_removed());
+    }
+
+    let cursor_session_log_dir = dirs::home_dir()
+        .unwrap()
+        .join(".cursor")
+        .join("skills")
+        .join("gitmemo-session-log");
+    if cursor_session_log_dir.exists() {
+        std::fs::remove_dir_all(&cursor_session_log_dir)?;
+        println!(
+            "  {} {}",
+            style("✓").green(),
+            t.cursor_session_log_skill_removed()
+        );
+    }
 
     let cursor_mcp_path = dirs::home_dir()
         .unwrap()

@@ -34,14 +34,18 @@ GitMemo 不是后台服务，而是注入编辑器的原生基础设施：
 |--------|------|
 | `CLAUDE.md` 指令 | 让 Claude 每次对话后自动保存为 Markdown |
 | `settings.json` Hook | 文件写入后自动 `git commit && git push` |
+| `~/.claude/skills/save` | `/save` 技能，便于显式触发「保存会话」 |
+| `~/.claude/skills/gitmemo-session-log` | 与 Cursor 相同：有实质内容的问答摘要写入 `<同步目录>/Doc/会话记录/` |
 | MCP Server | 让 Claude 能搜索历史对话、创建笔记 |
 
 **Cursor：**
 
 | 注入点 | 作用 |
 |--------|------|
-| `~/.cursor/rules/gitmemo.mdc` | 让 AI 每次对话后自动保存为 Markdown |
-| `cds_sync` MCP 工具 | AI 保存文件后调用此工具触发 git 同步 |
+| `~/.cursor/rules/gitmemo.mdc` | 让 AI 每次对话后自动保存为 Markdown（`init` **始终**写入该全局规则，含 `alwaysApply: true`，与是否只选 Claude Code 无关） |
+| `~/.cursor/skills/save` | 与 `/save` 技能说明，便于说「保存会话」时触发 |
+| `~/.cursor/skills/gitmemo-session-log` | 类 auto-save-qa：将有实质内容的问答摘要写入 `<同步目录>/Doc/会话记录/`，而非当前项目根下的 `Doc/` |
+| `cds_sync` MCP 工具 | AI 保存文件后调用此工具触发 git 同步（仅当 `init` 时选择 Cursor 且未 `--no-mcp`） |
 | MCP Server | 让 AI 能搜索历史对话、创建笔记 |
 
 ## 前置条件
@@ -163,6 +167,8 @@ gitmemo uninstall          # 移除配置（保留数据）
 │   └── scratch/            # 便签
 ├── clips/                  # 自动捕获的剪贴板内容
 │   └── 2026-03-25/
+├── Doc/
+│   └── 会话记录/           # 问答会话摘要（Cursor 技能 gitmemo-session-log）
 ├── plans/                  # Plan Mode 的实施方案
 ├── imports/                # 拖拽导入的文件
 ├── claude-config/          # AI 配置备份

@@ -328,10 +328,31 @@ impl I18n {
         }
     }
 
+    pub fn claude_session_log_skill_installed(&self) -> &str {
+        match self.lang {
+            Lang::En => "Claude Code session-log skill installed (~/.claude/skills/gitmemo-session-log)",
+            Lang::Zh => "已安装 Claude Code 会话摘要技能（~/.claude/skills/gitmemo-session-log）",
+        }
+    }
+
     pub fn cursor_rules_injected(&self) -> &str {
         match self.lang {
-            Lang::En => "Cursor Rules injected",
-            Lang::Zh => "Cursor Rules 已注入",
+            Lang::En => "Cursor global rule written (~/.cursor/rules/gitmemo.mdc)",
+            Lang::Zh => "已写入 Cursor 全局规则（~/.cursor/rules/gitmemo.mdc）",
+        }
+    }
+
+    pub fn cursor_save_skill_installed(&self) -> &str {
+        match self.lang {
+            Lang::En => "Cursor /save skill installed (~/.cursor/skills/save)",
+            Lang::Zh => "已安装 Cursor /save 技能（~/.cursor/skills/save）",
+        }
+    }
+
+    pub fn cursor_session_log_skill_installed(&self) -> &str {
+        match self.lang {
+            Lang::En => "Cursor session-log skill installed (~/.cursor/skills/gitmemo-session-log → Doc/会话记录 under sync dir)",
+            Lang::Zh => "已安装 Cursor 会话摘要技能（~/.cursor/skills/gitmemo-session-log → 同步目录下 Doc/会话记录）",
         }
     }
 
@@ -456,10 +477,31 @@ impl I18n {
         }
     }
 
+    pub fn claude_session_log_skill_removed(&self) -> &str {
+        match self.lang {
+            Lang::En => "Claude Code session-log skill removed",
+            Lang::Zh => "Claude Code 会话摘要技能已移除",
+        }
+    }
+
     pub fn cursor_rules_removed(&self) -> &str {
         match self.lang {
             Lang::En => "Cursor Rules removed",
             Lang::Zh => "Cursor Rules 已移除",
+        }
+    }
+
+    pub fn cursor_save_skill_removed(&self) -> &str {
+        match self.lang {
+            Lang::En => "Cursor /save skill removed",
+            Lang::Zh => "Cursor /save 技能已移除",
+        }
+    }
+
+    pub fn cursor_session_log_skill_removed(&self) -> &str {
+        match self.lang {
+            Lang::En => "Cursor session-log skill removed",
+            Lang::Zh => "Cursor 会话摘要技能已移除",
         }
     }
 

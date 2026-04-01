@@ -3,7 +3,9 @@ import { invoke } from "@tauri-apps/api/core";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { Plus, FileText, Calendar, BookOpen, Send, ChevronLeft, Pencil, Save, Trash2, X } from "lucide-react";
 import MarkdownView from "../components/MarkdownView";
+import { CopyPathButton } from "../components/CopyPathButton";
 import { useResizablePanel } from "../hooks/useResizablePanel";
+import { useRelativeTimeTick } from "../hooks/useRelativeTimeTick";
 import { relativeTime } from "../utils/time";
 import { useI18n } from "../hooks/useI18n";
 import { useToast } from "../hooks/useToast";
@@ -34,6 +36,7 @@ const tabs: { id: NoteTab; labelKey: string; icon: typeof FileText; folder: stri
 export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSidebar, enterTrigger: _enterTrigger }: { focusTrigger?: number; onFocusSidebar?: () => void; enterTrigger?: number }) {
   const { t } = useI18n();
   const { showToast } = useToast();
+  useRelativeTimeTick();
   const panel = useResizablePanel("notes", 300);
   const [activeTab, setActiveTab] = useState<NoteTab>("scratch");
   const [files, setFiles] = useState<FileEntry[]>([]);
@@ -48,6 +51,8 @@ export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSideba
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const editRef = useRef<HTMLTextAreaElement>(null);
   const itemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  /** True while IME composition is active (more reliable than keydown.isComposing alone in some WebViews). */
+  const imeComposingRef = useRef(false);
 
   // Keyboard nav for file list
   const navPrev = useCallback(() => {
@@ -212,8 +217,16 @@ export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSideba
               ref={textareaRef}
               value={newNote}
               onChange={(e) => setNewNote(e.target.value)}
+              onCompositionStart={() => { imeComposingRef.current = true; }}
+              onCompositionEnd={() => { imeComposingRef.current = false; }}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleCreateNote(); }
+                if (e.key !== "Enter" || e.shiftKey) return;
+                const ev = e.nativeEvent;
+                // IME: confirming candidates with Enter must not submit (Tauri/WebKit often flaky on isComposing alone)
+                if (imeComposingRef.current || ev.isComposing) return;
+                if ("keyCode" in ev && (ev as KeyboardEvent).keyCode === 229) return;
+                e.preventDefault();
+                void handleCreateNote();
               }}
               placeholder={activeTab === "daily" ? t("notes.placeholderDaily") : activeTab === "manual" ? t("notes.placeholderManual") : t("notes.placeholderScratch")}
               rows={3}
@@ -314,6 +327,7 @@ export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSideba
               <span style={{ flex: 1, fontSize: 12, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                 {selectedFile}
               </span>
+              {selectedFile ? <CopyPathButton relPath={selectedFile} /> : null}
               {editing ? (
                 <div style={{ display: "flex", gap: 4 }}>
                   <button onClick={handleSaveEdit} style={{ display: "flex", alignItems: "center", gap: 4, padding: "4px 10px", borderRadius: 6, fontSize: 11, background: "#0f2d0f", color: "var(--green)", border: "none", cursor: "pointer" }}>
