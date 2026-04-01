@@ -92,26 +92,43 @@ pub fn index_file(conn: &Connection, file_path: &str, source_type: &str, title: 
     Ok(())
 }
 
-/// Build index from all markdown files in the sync dir
+fn skip_index_path(path: &Path) -> bool {
+    let s = path.to_string_lossy();
+    s.contains("/.git/")
+        || s.contains("/.metadata/")
+        || s.contains("\\.git\\")
+        || s.contains("\\.metadata\\")
+}
+
+/// Subdirectory (relative to sync root) and FTS `source_type` for each tree.
+const INDEX_ROOTS: &[(&str, &str)] = &[
+    ("conversations", "conversation"),
+    ("notes/daily", "note"),
+    ("notes/manual", "note"),
+    ("notes/scratch", "note"),
+    ("notes/imports", "note"),
+    ("Doc/会话记录", "session_log"),
+    ("clips", "clip"),
+    ("plans", "plan"),
+    ("claude-config", "config"),
+    ("imports", "import"),
+];
+
+/// Build index from markdown files under known GitMemo subtrees (full-text search + MCP).
 pub fn build_index(conn: &Connection, sync_dir: &Path) -> Result<u32> {
     let mut count = 0u32;
 
-    for subdir in ["conversations", "notes/daily", "notes/manual", "notes/scratch"] {
+    for &(subdir, source_type) in INDEX_ROOTS {
         let dir = sync_dir.join(subdir);
         if !dir.exists() {
             continue;
         }
 
-        let source_type = if subdir == "conversations" {
-            "conversation"
-        } else {
-            "note"
-        };
-
         for entry in walkdir::WalkDir::new(&dir)
             .into_iter()
             .filter_map(|e| e.ok())
             .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
+            .filter(|e| !skip_index_path(e.path()))
         {
             let path = entry.path();
             let content = std::fs::read_to_string(path)?;

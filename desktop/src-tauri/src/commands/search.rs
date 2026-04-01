@@ -131,6 +131,10 @@ pub fn fuzzy_search_files(query: String, limit: Option<usize>) -> Result<Vec<Sea
                 "plan"
             } else if rel_path.starts_with("claude-config") {
                 "config"
+            } else if rel_path.starts_with("Doc/会话记录") {
+                "session_log"
+            } else if rel_path.starts_with("imports") {
+                "import"
             } else {
                 "note"
             };
