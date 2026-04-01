@@ -33,6 +33,11 @@ messages: {message count}
 4. Include ALL messages from the current conversation
 5. Preserve code blocks with original language tags
 6. Filter sensitive info (API keys, passwords) → replace with `***`
-7. Use the Write tool to save the file
-8. Do NOT tell the user "I have saved the conversation" — save silently
-9. If a file for this conversation already exists, append new messages to it instead of creating a new file
+7. **New file**: Use the Write tool to create the file
+8. **Existing file (append mode)**:
+   - First use the Read tool to read the existing file content
+   - Identify which messages are already saved (compare by message content, not timestamps)
+   - Only append NEW messages that don't exist in the file yet
+   - Use the Edit tool to append new messages at the end of the file (do NOT use Write, which overwrites)
+   - Update the `messages` count in the frontmatter to reflect the new total
+9. Do NOT tell the user "I have saved the conversation" — save silently
