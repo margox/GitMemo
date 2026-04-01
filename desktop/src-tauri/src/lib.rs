@@ -27,6 +27,7 @@ pub fn run() {
             notes::append_daily,
             notes::create_manual,
             notes::read_file,
+            notes::read_file_base64,
             notes::list_files,
             notes::update_note,
             notes::delete_note,
@@ -34,6 +35,7 @@ pub fn run() {
             search::search_all,
             search::recent_conversations,
             search::reindex,
+            search::fuzzy_search_files,
             // Stats
             stats::get_stats,
             stats::get_status,
@@ -148,6 +150,22 @@ pub fn run() {
                     let _ = w.show();
                     let _ = w.set_focus();
                     let _ = app_handle.emit("global-shortcut-search", ());
+                }
+            })?;
+
+            // --- Global Shortcut: Cmd+Shift+Space → toggle Quick Paste ---
+            let qp_shortcut = Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::Space);
+            let qp_handle = app.handle().clone();
+            app.global_shortcut().on_shortcut(qp_shortcut, move |_app, _shortcut, _event| {
+                if let Some(w) = qp_handle.get_webview_window("quick-paste") {
+                    if w.is_visible().unwrap_or(false) {
+                        let _ = w.hide();
+                    } else {
+                        let _ = w.center();
+                        let _ = w.show();
+                        let _ = w.set_focus();
+                        let _ = qp_handle.emit("quick-paste-show", ());
+                    }
                 }
             })?;
 
