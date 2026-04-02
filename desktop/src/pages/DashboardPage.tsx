@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useI18n } from "../hooks/useI18n";
+import { formatAbsoluteTime } from "../utils/time";
 import {
   MessageSquare, StickyNote, BookOpen, FileText, Clipboard,
   HardDrive, GitBranch, GitCommit, RefreshCw, Zap, FolderOpen, Terminal, Lightbulb,
@@ -23,9 +24,11 @@ interface AppStatus {
   git_remote: string;
   git_branch: string;
   unpushed: number;
+  behind: number;
   last_commit_id: string;
   last_commit_msg: string;
   last_commit_time: string;
+  checked_at: string;
 }
 
 
@@ -94,6 +97,31 @@ export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page
     padding: "16px 20px",
   };
 
+  const syncStatus = (() => {
+    if (status.behind > 0 && status.unpushed > 0) {
+      return {
+        text: t("dashboard.diverged", String(status.unpushed), String(status.behind)),
+        color: "var(--yellow)",
+      };
+    }
+    if (status.behind > 0) {
+      return {
+        text: t("dashboard.behind", String(status.behind)),
+        color: "var(--red)",
+      };
+    }
+    if (status.unpushed > 0) {
+      return {
+        text: `${status.unpushed} ${t("dashboard.unpushed")}`,
+        color: "var(--yellow)",
+      };
+    }
+    return {
+      text: t("dashboard.synced"),
+      color: "var(--green)",
+    };
+  })();
+
   return (
     <div style={{ padding: "20px 28px 28px", overflowY: "auto", height: "100%" }}>
       <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>{t("dashboard.title")}</h1>
@@ -137,14 +165,10 @@ export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page
             <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>{t("dashboard.syncStatus")}</span>
           </div>
           <p style={{ fontSize: 18, fontWeight: 700 }}>
-            {status.unpushed > 0 ? (
-              <span style={{ color: "var(--yellow)" }}>{status.unpushed} {t("dashboard.unpushed")}</span>
-            ) : (
-              <span style={{ color: "var(--green)" }}>{t("dashboard.synced")}</span>
-            )}
+            <span style={{ color: syncStatus.color }}>{syncStatus.text}</span>
           </p>
           <p style={{ fontSize: 10, color: "var(--text-secondary)", marginTop: 6 }}>
-            {new Date().toLocaleString()}
+            {formatAbsoluteTime(status.checked_at || status.last_commit_time)}
           </p>
         </div>
 
@@ -159,7 +183,7 @@ export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page
           </p>
           {status.last_commit_time && (
             <p style={{ fontSize: 10, color: "var(--text-secondary)", marginTop: 6 }}>
-              {status.last_commit_time}
+              {formatAbsoluteTime(status.last_commit_time)}
             </p>
           )}
         </div>

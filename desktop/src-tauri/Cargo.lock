@@ -1646,7 +1646,7 @@ dependencies = [
 
 [[package]]
 name = "gitmemo"
-version = "0.1.13"
+version = "0.1.14"
 dependencies = [
  "anyhow",
  "chrono",
@@ -1670,7 +1670,7 @@ dependencies = [
 
 [[package]]
 name = "gitmemo-desktop"
-version = "0.1.0"
+version = "0.1.14"
 dependencies = [
  "anyhow",
  "arboard",
@@ -1695,6 +1695,7 @@ dependencies = [
  "thiserror 2.0.18",
  "tokio",
  "toml 0.8.2",
+ "url",
  "walkdir",
 ]
 

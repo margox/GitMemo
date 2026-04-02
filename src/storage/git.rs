@@ -219,16 +219,34 @@ fn do_push(repo_path: &Path) -> (bool, Option<String>) {
 /// 4. `origin/main` then `origin/master` — common defaults
 /// 5. Compare local HEAD with `git ls-remote` (ground truth, requires network)
 pub fn unpushed_count(repo_path: &Path) -> Result<usize> {
+    let (ahead, _) = ahead_behind(repo_path)?;
+    Ok(ahead)
+}
+
+/// Count local commits ahead of remote and commits behind remote.
+///
+/// Returns `(ahead, behind)`.
+pub fn ahead_behind(repo_path: &Path) -> Result<(usize, usize)> {
+    if !has_remote(repo_path) {
+        return Ok((0, 0));
+    }
+
+    for target in build_tracking_targets(repo_path) {
+        if let Some((ahead, behind)) = rev_list_left_right_count(repo_path, &format!("HEAD...{}", target)) {
+            return Ok((ahead, behind));
+        }
+    }
+
     // Strategy 1: Use @{u} (upstream tracking ref)
     if let Some(count) = rev_list_count(repo_path, "@{u}..HEAD") {
-        return Ok(count);
+        return Ok((count, 0));
     }
 
     // Strategy 2: Use configured branch from config.toml
     let cfg_branch = configured_branch(repo_path);
     let refspec = format!("origin/{}..HEAD", cfg_branch);
     if let Some(count) = rev_list_count(repo_path, &refspec) {
-        return Ok(count);
+        return Ok((count, 0));
     }
 
     // Strategy 3: Get current branch name, try origin/<branch>
@@ -236,7 +254,7 @@ pub fn unpushed_count(repo_path: &Path) -> Result<usize> {
         if branch != cfg_branch {
             let refspec = format!("origin/{}..HEAD", branch);
             if let Some(count) = rev_list_count(repo_path, &refspec) {
-                return Ok(count);
+                return Ok((count, 0));
             }
         }
     }
@@ -245,17 +263,17 @@ pub fn unpushed_count(repo_path: &Path) -> Result<usize> {
     for remote_ref in &["origin/main", "origin/master"] {
         let refspec = format!("{}..HEAD", remote_ref);
         if let Some(count) = rev_list_count(repo_path, &refspec) {
-            return Ok(count);
+            return Ok((count, 0));
         }
     }
 
     // Strategy 5: Compare local HEAD with remote via ls-remote (network call)
     if let Some(count) = count_via_ls_remote(repo_path) {
-        return Ok(count);
+        return Ok((count, 0));
     }
 
     // If all strategies fail, return 0 but has_unpushed() will catch this
-    Ok(0)
+    Ok((0, 0))
 }
 
 /// Check if there are ANY unpushed commits (more reliable than count)
@@ -469,6 +487,48 @@ fn build_refspec_candidates(repo_path: &Path) -> Vec<String> {
     candidates
 }
 
+fn build_tracking_targets(repo_path: &Path) -> Vec<String> {
+    let mut candidates = Vec::new();
+    let cfg_branch = configured_branch(repo_path);
+
+    candidates.push("@{u}".to_string());
+    candidates.push(format!("origin/{}", cfg_branch));
+
+    if let Some(branch) = current_branch(repo_path) {
+        if branch != cfg_branch {
+            candidates.push(format!("origin/{}", branch));
+        }
+    }
+
+    for default in &["origin/main", "origin/master"] {
+        if !candidates.iter().any(|c| c == default) {
+            candidates.push((*default).to_string());
+        }
+    }
+
+    candidates
+}
+
+fn rev_list_left_right_count(repo_path: &Path, refspec: &str) -> Option<(usize, usize)> {
+    let output = std::process::Command::new("git")
+        .args(["rev-list", "--left-right", "--count", refspec])
+        .current_dir(repo_path)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .output()
+        .ok()?;
+
+    if !output.status.success() {
+        return None;
+    }
+
+    let counts = String::from_utf8_lossy(&output.stdout);
+    let mut parts = counts.split_whitespace();
+    let ahead = parts.next()?.parse().ok()?;
+    let behind = parts.next()?.parse().ok()?;
+    Some((ahead, behind))
+}
+
 /// Push only (no commit)
 pub fn push(repo_path: &Path) -> Result<SyncResult> {
     let (pushed, push_error) = do_push(repo_path);
@@ -482,6 +542,25 @@ pub fn pull(repo_path: &Path) -> Result<bool> {
 
     let output = std::process::Command::new("git")
         .args(["pull", "--rebase", "origin", &branch])
+        .current_dir(repo_path)
+        .stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::piped())
+        .output();
+
+    match output {
+        Ok(o) if o.status.success() => Ok(true),
+        _ => Ok(false),
+    }
+}
+
+/// Fetch the remote tracking refs without rebasing the worktree.
+pub fn fetch(repo_path: &Path) -> Result<bool> {
+    if !has_remote(repo_path) {
+        return Ok(false);
+    }
+
+    let output = std::process::Command::new("git")
+        .args(["fetch", "--quiet", "origin"])
         .current_dir(repo_path)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())

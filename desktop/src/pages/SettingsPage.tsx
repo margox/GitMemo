@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { Settings, Power, Clipboard, Sun, Moon, GitBranch, ExternalLink, Globe, FolderOpen, Globe2, Terminal } from "lucide-react";
 import type { Theme } from "../App";
 import { useI18n, type Locale } from "../hooks/useI18n";
@@ -8,6 +9,13 @@ import { useToast } from "../hooks/useToast";
 interface DesktopSettings {
   autostart: boolean;
   clipboard_autostart: boolean;
+}
+
+interface AppMeta {
+  version: string;
+  release_time: string;
+  requires_cli: boolean;
+  recommended_cli_version: string;
 }
 
 function Toggle({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
@@ -57,6 +65,7 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
   const [syncDir, setSyncDir] = useState("");
   const [gitRemote, setGitRemote] = useState("");
   const [claudeEnabled, setClaudeEnabled] = useState(false);
+  const [appMeta, setAppMeta] = useState<AppMeta | null>(null);
 
   useEffect(() => {
     invoke<DesktopSettings>("get_settings").then(setSettings).catch(console.error);
@@ -66,6 +75,7 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
       setGitRemote(s.git_remote);
     }).catch(console.error);
     invoke<boolean>("get_claude_integration_status").then(setClaudeEnabled).catch(console.error);
+    invoke<AppMeta>("get_app_meta").then(setAppMeta).catch(console.error);
   }, []);
 
   const toggleAutostart = async () => {
@@ -311,13 +321,32 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
         </div>
       </div>
 
+      <div style={{ ...cardStyle, marginTop: 20 }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <p style={{ fontSize: 13, fontWeight: 600 }}>{t("settings.shortcuts")}</p>
+          <p style={{ fontSize: 12, color: "var(--text-secondary)" }}>{t("settings.shortcutSearch")}</p>
+          <p style={{ fontSize: 12, color: "var(--text-secondary)" }}>{t("settings.shortcutGlobalSearch")}</p>
+          <p style={{ fontSize: 12, color: "var(--text-secondary)" }}>{t("settings.shortcutQuickNote")}</p>
+          <p style={{ fontSize: 12, color: "var(--text-secondary)" }}>{t("settings.shortcutTogglePaste")}</p>
+          <p style={{ fontSize: 12, color: "var(--text-secondary)" }}>{t("settings.shortcutFind")}</p>
+          <p style={{ fontSize: 12, color: "var(--text-secondary)" }}>{t("settings.shortcutEditDelete")}</p>
+        </div>
+      </div>
+
       {/* About */}
       <div style={{ marginTop: 20, display: "flex", flexDirection: "column", alignItems: "center", padding: "20px 0" }}>
         <img src="/logo.png" alt="GitMemo" style={{ width: 48, height: 48, borderRadius: 10, marginBottom: 10 }} />
         <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>GitMemo Desktop</p>
-        <p style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 8 }}>v0.2.0</p>
+        <p style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 4 }}>v{appMeta?.version ?? "—"}</p>
+        <p style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 4 }}>
+          {t("settings.releaseTime")}: {appMeta?.release_time || t("settings.releaseTimeUnknown")}
+        </p>
+        <p style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 8, textAlign: "center" }}>
+          {appMeta?.requires_cli ? t("settings.cliRequired") : t("settings.cliOptional")}
+          {appMeta?.recommended_cli_version ? ` · ${t("settings.recommendedCliVersion", appMeta.recommended_cli_version)}` : ""}
+        </p>
         <button
-          onClick={() => window.open("https://github.com/sahadev/gitmemo")}
+          onClick={() => void openUrl("https://github.com/sahadev/gitmemo")}
           style={{
             display: "flex", alignItems: "center", gap: 5,
             fontSize: 11, color: "var(--accent)", background: "none",

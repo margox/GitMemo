@@ -1,6 +1,6 @@
 [package]
 name = "gitmemo-desktop"
-version = "0.1.0"
+version = "0.1.14"
 description = "GitMemo Desktop - Your AI knowledge, always in Git"
 authors = ["GitMemo Team"]
 edition = "2021"
@@ -11,6 +11,7 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]
 tauri-build = { version = "2", features = [] }
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 
 [dependencies]
 # Tauri
@@ -59,6 +60,7 @@ base64 = "0.22"
 
 # Config
 toml = "0.8"
+url = "2"
 
 # File watching (for clipboard & file change events)
 notify = { version = "7", features = ["macos_kqueue"] }

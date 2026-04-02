@@ -3,6 +3,11 @@ import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { useSyncState, type UseSyncStateReturn } from "./useSyncState";
 
+interface GitSyncEvent {
+  ok: boolean;
+  message: string;
+}
+
 interface SyncContextType extends UseSyncStateReturn {
   /** Manually trigger a full sync (commit + pull + push) */
   triggerSync: () => Promise<void>;
@@ -19,8 +24,12 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     const unStart = listen("git-sync-start", () => {
       sync.setSyncing();
     });
-    const unEnd = listen("git-sync-end", () => {
-      sync.setSuccess("Synced");
+    const unEnd = listen<GitSyncEvent>("git-sync-end", ({ payload }) => {
+      if (payload?.ok === false) {
+        sync.setFailed(payload.message || "Sync failed");
+      } else {
+        sync.setSuccess(payload?.message || "Synced");
+      }
       timer.current = window.setTimeout(() => sync.reset(), 3000);
     });
     return () => {

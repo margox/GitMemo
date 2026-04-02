@@ -1,18 +1,29 @@
 use gitmemo_core::storage::{files, git};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
+use std::path::Path;
 use std::sync::atomic::{AtomicBool, Ordering};
 #[cfg(target_os = "macos")]
 use std::sync::{Arc, Mutex};
 use tauri::{AppHandle, Emitter};
 
+use super::import;
+
 static WATCHING: AtomicBool = AtomicBool::new(false);
+
+pub fn is_watching() -> bool {
+    WATCHING.load(Ordering::SeqCst)
+}
 
 /// Minimum characters to save (filter out passwords, short copies)
 const MIN_LENGTH: usize = 10;
 
 /// Interval between clipboard checks (ms)
 const POLL_INTERVAL_MS: u64 = 300;
+
+fn local_timestamp(now: &chrono::DateTime<chrono::Local>) -> String {
+    now.to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
+}
 
 #[derive(Debug, Clone, Serialize)]
 pub struct ClipboardEvent {
@@ -80,6 +91,7 @@ pub fn save_clipboard_now(content: String) -> Result<ClipboardEvent, String> {
 /// Work collected on the main thread (macOS); saving runs on the poll thread afterward.
 enum PendingClip {
     Text(String),
+    Files(Vec<String>),
     Image {
         width: usize,
         height: usize,
@@ -92,6 +104,31 @@ enum PendingClip {
 fn is_redundant_image_data_url(text: &str) -> bool {
     let t = text.trim_start();
     t.starts_with("data:image/") && t.contains(";base64,")
+}
+
+fn clipboard_file_paths(text: &str) -> Vec<String> {
+    let mut paths = Vec::new();
+    for line in text.lines().map(str::trim).filter(|line| !line.is_empty()) {
+        if let Some(url) = line.strip_prefix("file://") {
+            let candidate = format!("file://{}", url);
+            if let Ok(parsed) = url::Url::parse(&candidate) {
+                if let Ok(path) = parsed.to_file_path() {
+                    if path.exists() {
+                        paths.push(path.to_string_lossy().to_string());
+                        continue;
+                    }
+                }
+            }
+        }
+
+        let path = Path::new(line);
+        if path.is_absolute() && path.exists() {
+            paths.push(path.to_string_lossy().to_string());
+        }
+    }
+    paths.sort();
+    paths.dedup();
+    paths
 }
 
 /// One poll cycle: read clipboard and detect changes; does not touch disk.
@@ -109,15 +146,21 @@ fn collect_pending_clips(
     );
 
     if let Ok(text) = clipboard.get_text() {
-        if !text.is_empty() && text.len() >= MIN_LENGTH {
+        if !text.is_empty() {
             let hash = content_hash(&text);
             if hash != *last_text_hash {
                 if has_raster_image && is_redundant_image_data_url(&text) {
                     // Same copy as `get_image()`; record hash only so we don't re-trigger forever.
                     *last_text_hash = hash;
                 } else {
-                    *last_text_hash = hash;
-                    pending.push(PendingClip::Text(text));
+                    let file_paths = clipboard_file_paths(&text);
+                    if !file_paths.is_empty() {
+                        *last_text_hash = hash;
+                        pending.push(PendingClip::Files(file_paths));
+                    } else if text.len() >= MIN_LENGTH {
+                        *last_text_hash = hash;
+                        pending.push(PendingClip::Text(text));
+                    }
                 }
             }
         }
@@ -147,6 +190,24 @@ fn flush_pending_clips(pending: Vec<PendingClip>) -> Vec<ClipboardEvent> {
             PendingClip::Text(text) => {
                 if let Ok(event) = save_clip_content(&text) {
                     events.push(event);
+                }
+            }
+            PendingClip::Files(paths) => {
+                if let Ok(result) = import::import_paths(paths) {
+                    if let Some(first) = result.imported.first() {
+                        let now = chrono::Local::now();
+                        let preview = if result.imported.len() == 1 {
+                            format!("Imported {}", first.original_name)
+                        } else {
+                            format!("Imported {} files", result.imported.len())
+                        };
+                        events.push(ClipboardEvent {
+                            saved: true,
+                            path: first.dest_path.clone(),
+                            preview,
+                            timestamp: now.format("%H:%M:%S").to_string(),
+                        });
+                    }
                 }
             }
             PendingClip::Image {
@@ -280,7 +341,7 @@ fn save_clip_content(content: &str) -> Result<ClipboardEvent, String> {
     // Write markdown
     let md = format!(
         "---\ndate: {}\nsource: clipboard\nchars: {}\n---\n\n{}\n",
-        now.format("%Y-%m-%d %H:%M:%S"),
+        local_timestamp(&now),
         content.len(),
         content
     );
@@ -392,7 +453,7 @@ fn save_clip_image_from_rgba(
 
     let md = format!(
         "---\ndate: {}\nsource: clipboard-image\nwidth: {}\nheight: {}\n---\n\n![screenshot]({})\n",
-        now.format("%Y-%m-%d %H:%M:%S"),
+        local_timestamp(&now),
         width,
         height,
         png_filename

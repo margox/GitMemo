@@ -57,10 +57,11 @@ jobs:
               NEW_PATCH=$((PATCH + 1))
               NEW_VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
               sed -i "s/^version = \"${CURRENT}\"/version = \"${NEW_VERSION}\"/" Cargo.toml
+              python3 scripts/sync_desktop_version.py "${NEW_VERSION}"
               # Commit and push the version bump
               git config user.name "github-actions[bot]"
               git config user.email "github-actions[bot]@users.noreply.github.com"
-              git add Cargo.toml
+              git add Cargo.toml desktop/package.json desktop/src-tauri/Cargo.toml desktop/src-tauri/tauri.conf.json
               git commit -m "chore: auto-bump version to ${NEW_VERSION} [skip ci]"
               git push origin HEAD:main
               # Update output with new version
@@ -100,6 +101,9 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
+      - name: Sync desktop version files
+        run: python3 scripts/sync_desktop_version.py
+
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
 
@@ -138,6 +142,9 @@ jobs:
         with:
           key: desktop-${{ matrix.artifact_suffix }}
 
+      - name: Sync desktop version files
+        run: python3 scripts/sync_desktop_version.py
+
       - uses: pnpm/action-setup@v4
         with:
           version: 9
@@ -167,8 +174,6 @@ jobs:
           path: |
             desktop/src-tauri/target/**/release/bundle/dmg/*.dmg
             desktop/src-tauri/target/**/release/bundle/macos/*.app.tar.gz
-            desktop/src-tauri/target/**/release/bundle/appimage/*.AppImage
-            desktop/src-tauri/target/**/release/bundle/deb/*.deb
 
   release:
     needs: [check-version, build, build-desktop]

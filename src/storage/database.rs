@@ -1,6 +1,7 @@
 use anyhow::Result;
 use rusqlite::{params, Connection};
 use sha2::{Digest, Sha256};
+use std::collections::HashSet;
 use std::path::Path;
 
 pub struct SearchResult {
@@ -56,6 +57,20 @@ fn content_hash(content: &str) -> String {
     let mut hasher = Sha256::new();
     hasher.update(content.as_bytes());
     format!("{:x}", hasher.finalize())
+}
+
+fn frontmatter_time(content: &str) -> Option<String> {
+    for key in ["date:", "updated:", "created:"] {
+        if let Some(value) = content
+            .lines()
+            .find(|l| l.starts_with(key))
+            .map(|l| l.trim_start_matches(key).trim().to_string())
+            .filter(|value| !value.is_empty())
+        {
+            return Some(value);
+        }
+    }
+    None
 }
 
 /// Index a single file into the database
@@ -116,6 +131,7 @@ const INDEX_ROOTS: &[(&str, &str)] = &[
 /// Build index from markdown files under known GitMemo subtrees (full-text search + MCP).
 pub fn build_index(conn: &Connection, sync_dir: &Path) -> Result<u32> {
     let mut count = 0u32;
+    let mut seen_paths = HashSet::new();
 
     for &(subdir, source_type) in INDEX_ROOTS {
         let dir = sync_dir.join(subdir);
@@ -145,28 +161,39 @@ pub fn build_index(conn: &Connection, sync_dir: &Path) -> Result<u32> {
                 });
 
             // Extract date from frontmatter or filename
-            let date = content
-                .lines()
-                .find(|l| l.starts_with("date:"))
-                .map(|l| l.trim_start_matches("date:").trim().to_string())
-                .unwrap_or_else(|| {
-                    path.file_stem()
-                        .unwrap_or_default()
-                        .to_string_lossy()
-                        .chars()
-                        .take(10)
-                        .collect()
-                });
+            let date = frontmatter_time(&content).unwrap_or_else(|| {
+                path.file_stem()
+                    .unwrap_or_default()
+                    .to_string_lossy()
+                    .chars()
+                    .take(10)
+                    .collect()
+            });
 
             let rel_path = path
                 .strip_prefix(sync_dir)
                 .unwrap_or(path)
                 .to_string_lossy()
                 .to_string();
+            seen_paths.insert(rel_path.clone());
 
             index_file(conn, &rel_path, source_type, &title, &content, &date)?;
             count += 1;
         }
+    }
+
+    let stale_docs: Vec<(String, String)> = {
+        let mut stmt = conn.prepare("SELECT id, file_path FROM documents")?;
+        let rows = stmt.query_map([], |row| Ok((row.get(0)?, row.get(1)?)))?;
+        rows
+            .filter_map(|row| row.ok())
+            .filter(|(_, file_path)| !seen_paths.contains(file_path))
+            .collect()
+    };
+
+    for (id, _) in stale_docs {
+        conn.execute("DELETE FROM documents WHERE id = ?1", params![id])?;
+        conn.execute("DELETE FROM search_index WHERE doc_id = ?1", params![id])?;
     }
 
     Ok(count)

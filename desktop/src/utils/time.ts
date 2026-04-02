@@ -4,13 +4,45 @@
 export function parseGitMemoDate(dateStr: string): Date | null {
   const s = dateStr.trim();
   if (!s) return null;
-  let candidate = s;
-  // `YYYY-MM-DD HH:mm...` without `T` → normalize for Date (ISO with offset usually already has `T`)
-  if (!s.includes("T") && /^\d{4}-\d{2}-\d{2} \d/.test(s)) {
-    candidate = s.replace(" ", "T");
+  if (/^\d{4}-\d{2}-\d{2}$/.test(s)) {
+    const [year, month, day] = s.split("-").map(Number);
+    const d = new Date(year, month - 1, day, 0, 0, 0);
+    return Number.isNaN(d.getTime()) ? null : d;
   }
+  if (!s.includes("T") && /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}(:\d{2})?$/.test(s)) {
+    const [datePart, timePart] = s.split(" ");
+    const [year, month, day] = datePart.split("-").map(Number);
+    const [hour, minute, second = 0] = timePart.split(":").map(Number);
+    const d = new Date(year, month - 1, day, hour, minute, second);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  const candidate = s.endsWith(" UTC") ? `${s.slice(0, -4).replace(" ", "T")}Z` : s;
   const d = new Date(candidate);
   return Number.isNaN(d.getTime()) ? null : d;
+}
+
+export function formatAbsoluteTime(dateStr: string, includeSeconds = false): string {
+  const d = parseGitMemoDate(dateStr);
+  if (!d) return dateStr;
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: includeSeconds ? "2-digit" : undefined,
+    hour12: false,
+  }).format(d);
+}
+
+export function formatDateOnly(dateStr: string): string {
+  const d = parseGitMemoDate(dateStr);
+  if (!d) return dateStr.slice(0, 10);
+  return new Intl.DateTimeFormat(undefined, {
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
 }
 
 /**
@@ -23,9 +55,9 @@ export function relativeTime(
 ): string {
   try {
     const d = parseGitMemoDate(dateStr);
-    if (!d) return dateStr.slice(0, 16);
+    if (!d) return dateStr;
     const diff = Math.floor((Date.now() - d.getTime()) / 1000);
-    if (diff < 0) return dateStr.slice(0, 16);
+    if (diff < 0) return formatAbsoluteTime(dateStr);
     const tr = t || ((key: string, ...args: (string | number)[]) => {
       // Fallback English
       const map: Record<string, string> = {
@@ -42,7 +74,7 @@ export function relativeTime(
     if (diff < 3600) return tr("time.minAgo", Math.floor(diff / 60));
     if (diff < 86400) return tr("time.hrAgo", Math.floor(diff / 3600));
     if (diff < 604800) return tr("time.dayAgo", Math.floor(diff / 86400));
-    return dateStr.slice(0, 16);
+    return formatAbsoluteTime(dateStr);
   } catch {
     return dateStr;
   }

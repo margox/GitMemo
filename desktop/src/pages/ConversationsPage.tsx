@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ask } from "@tauri-apps/plugin-dialog";
-import { MessageSquare, Trash2, ChevronLeft } from "lucide-react";
+import { MessageSquare, Trash2, ChevronLeft, Pencil, Save, X } from "lucide-react";
 import MarkdownView from "../components/MarkdownView";
 import { CopyPathButton } from "../components/CopyPathButton";
 import { useResizablePanel } from "../hooks/useResizablePanel";
 import { useRelativeTimeTick } from "../hooks/useRelativeTimeTick";
-import { relativeTime } from "../utils/time";
+import { formatDateOnly, relativeTime } from "../utils/time";
 import { useI18n } from "../hooks/useI18n";
 import { useToast } from "../hooks/useToast";
 
@@ -92,10 +92,14 @@ export default function ConversationsPage({ onFocusSidebar, enterTrigger, sideba
   const [metaCache, setMetaCache] = useState<Map<string, ConversationMeta>>(new Map());
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [rawContent, setRawContent] = useState("");
   const [rawBody, setRawBody] = useState("");
   const [currentMeta, setCurrentMeta] = useState<ConversationMeta | null>(null);
   const [loading, setLoading] = useState(true);
+  const [editing, setEditing] = useState(false);
+  const [editContent, setEditContent] = useState("");
   const itemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const editRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => { loadFiles(); }, []);
 
@@ -123,22 +127,54 @@ export default function ConversationsPage({ onFocusSidebar, enterTrigger, sideba
     }
   };
 
-  const openFile = async (path: string) => {
+  const applyConversationRaw = useCallback((path: string, raw: string) => {
+    const { meta, body } = parseFrontmatter(raw);
+    setSelectedFile(path);
+    setCurrentMeta(meta);
+    setRawContent(raw);
+    setRawBody(body);
+    setMessages(parseMessages(body));
+  }, []);
+
+  const openFile = useCallback(async (path: string) => {
     try {
       const raw = await invoke<string>("read_file", { filePath: path });
-      const { meta, body } = parseFrontmatter(raw);
-      setSelectedFile(path);
-      setCurrentMeta(meta);
-      setRawBody(body);
-      setMessages(parseMessages(body));
-      // Scroll selected item into view
+      applyConversationRaw(path, raw);
+      setEditing(false);
+      setEditContent("");
       setTimeout(() => {
         itemRefs.current.get(path)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
       }, 50);
     } catch (e) {
       console.error(e);
     }
-  };
+  }, [applyConversationRaw]);
+
+  const startEdit = useCallback(() => {
+    if (!selectedFile) return;
+    setEditing(true);
+    setEditContent(rawContent);
+    window.setTimeout(() => editRef.current?.focus(), 0);
+  }, [selectedFile, rawContent]);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!selectedFile) return;
+    try {
+      await invoke("update_note", { filePath: selectedFile, content: editContent });
+      applyConversationRaw(selectedFile, editContent);
+      setMetaCache((prev) => {
+        const next = new Map(prev);
+        next.set(selectedFile, parseFrontmatter(editContent).meta);
+        return next;
+      });
+      setEditing(false);
+      setEditContent("");
+      showToast(t("conversations.saved"));
+      void loadFiles();
+    } catch (e) {
+      showToast(`Error: ${e}`, true);
+    }
+  }, [selectedFile, editContent, applyConversationRaw, showToast, t]);
 
   const handleDelete = async () => {
     if (!selectedFile) return;
@@ -156,6 +192,9 @@ export default function ConversationsPage({ onFocusSidebar, enterTrigger, sideba
         setSelectedFile(null);
         setMessages([]);
         setCurrentMeta(null);
+        setRawBody("");
+        setRawContent("");
+        setEditing(false);
       }
       showToast(t("conversations.deleted"));
       loadFiles();
@@ -182,10 +221,14 @@ export default function ConversationsPage({ onFocusSidebar, enterTrigger, sideba
       if (sidebarFocused) return; // App handles up/down when sidebar focused
       if (e.key === "ArrowUp") { e.preventDefault(); navigatePrev(); }
       if (e.key === "ArrowDown") { e.preventDefault(); navigateNext(); }
+      if (!editing && selectedFile && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "e") {
+        e.preventDefault();
+        startEdit();
+      }
       if (e.key === "ArrowLeft") {
         e.preventDefault();
         if (selectedFile) {
-          setSelectedFile(null); setMessages([]); setCurrentMeta(null);
+          setSelectedFile(null); setMessages([]); setCurrentMeta(null); setRawBody(""); setRawContent(""); setEditing(false);
         } else {
           onFocusSidebar?.();
         }
@@ -199,7 +242,7 @@ export default function ConversationsPage({ onFocusSidebar, enterTrigger, sideba
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [navigatePrev, navigateNext, selectedFile, files, sidebarFocused]);
+  }, [navigatePrev, navigateNext, selectedFile, files, sidebarFocused, editing, startEdit, onFocusSidebar]);
 
   return (
     <div style={{ display: "flex", height: "100%" }}>
@@ -300,7 +343,7 @@ export default function ConversationsPage({ onFocusSidebar, enterTrigger, sideba
               padding: "10px 20px", borderBottom: "1px solid var(--border)", flexShrink: 0,
             }}>
               <button
-                onClick={() => { setSelectedFile(null); setMessages([]); setCurrentMeta(null); }}
+                onClick={() => { setSelectedFile(null); setMessages([]); setCurrentMeta(null); setRawBody(""); setRawContent(""); setEditing(false); }}
                 style={{ padding: 4, borderRadius: 4, background: "none", border: "none", cursor: "pointer", color: "var(--text-secondary)" }}
               >
                 <ChevronLeft size={16} />
@@ -329,9 +372,49 @@ export default function ConversationsPage({ onFocusSidebar, enterTrigger, sideba
                   {currentMeta.messages} {t("conversations.msgs")}
                 </span>
               )}
-              {selectedFile ? <CopyPathButton relPath={selectedFile} /> : null}
+              {selectedFile && !editing ? <CopyPathButton relPath={selectedFile} /> : null}
+              {editing ? (
+                <>
+                  <button
+                    onClick={() => { setEditing(false); setEditContent(""); }}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 4, padding: "5px 10px",
+                      borderRadius: 6, fontSize: 12, cursor: "pointer",
+                      background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text-secondary)",
+                    }}
+                    title={t("common.cancel")}
+                  >
+                    <X size={12} />
+                  </button>
+                  <button
+                    onClick={() => void handleSaveEdit()}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 4, padding: "5px 10px",
+                      borderRadius: 6, fontSize: 12, cursor: "pointer",
+                      background: "var(--bg)", border: "1px solid var(--border)", color: "var(--accent)",
+                    }}
+                    title={t("conversations.save")}
+                  >
+                    <Save size={12} />
+                    {t("conversations.save")}
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={startEdit}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 4, padding: "5px 10px",
+                    borderRadius: 6, fontSize: 12, cursor: "pointer",
+                    background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text-secondary)",
+                  }}
+                  title={t("conversations.edit")}
+                >
+                  <Pencil size={12} />
+                  {t("conversations.edit")}
+                </button>
+              )}
               <button
-                onClick={handleDelete}
+                onClick={() => void handleDelete()}
                 style={{
                   padding: 6, borderRadius: 4, background: "none", border: "none",
                   cursor: "pointer", color: "var(--text-secondary)",
@@ -344,7 +427,39 @@ export default function ConversationsPage({ onFocusSidebar, enterTrigger, sideba
 
             {/* Messages */}
             <div style={{ flex: 1, overflowY: "auto", padding: "20px 24px", userSelect: "text" }}>
-              {messages.length > 0 ? messages.map((msg, i) => (
+              {editing ? (
+                <textarea
+                  ref={editRef}
+                  value={editContent}
+                  onChange={(e) => setEditContent(e.target.value)}
+                  onKeyDown={(e) => {
+                    if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+                      e.preventDefault();
+                      void handleSaveEdit();
+                    }
+                    if (e.key === "Escape") {
+                      e.preventDefault();
+                      setEditing(false);
+                      setEditContent("");
+                    }
+                  }}
+                  spellCheck={false}
+                  style={{
+                    width: "100%",
+                    minHeight: "100%",
+                    resize: "none",
+                    padding: 16,
+                    borderRadius: 10,
+                    border: "1px solid var(--border)",
+                    background: "var(--bg-card)",
+                    color: "var(--text)",
+                    fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                    fontSize: 13,
+                    lineHeight: 1.6,
+                    outline: "none",
+                  }}
+                />
+              ) : messages.length > 0 ? messages.map((msg, i) => (
                 <div
                   key={i}
                   style={{
@@ -364,7 +479,7 @@ export default function ConversationsPage({ onFocusSidebar, enterTrigger, sideba
                     </span>
                     {msg.timestamp && (
                       <span style={{ color: "var(--text-secondary)", fontWeight: 400 }}>
-                        {currentMeta?.date ? currentMeta.date.slice(0, 10) + " " : ""}{msg.timestamp}
+                        {currentMeta?.date ? `${formatDateOnly(currentMeta.date)} ` : ""}{msg.timestamp}
                       </span>
                     )}
                   </div>

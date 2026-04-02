@@ -22,6 +22,14 @@ impl Default for DesktopSettings {
     }
 }
 
+#[derive(Debug, Clone, Serialize)]
+pub struct AppMeta {
+    pub version: String,
+    pub release_time: String,
+    pub requires_cli: bool,
+    pub recommended_cli_version: String,
+}
+
 fn settings_path() -> std::path::PathBuf {
     files::sync_dir().join(".metadata").join(SETTINGS_FILE)
 }
@@ -50,6 +58,16 @@ fn save_settings(settings: &DesktopSettings) -> Result<(), String> {
 
 pub fn should_autostart_clipboard() -> bool {
     load_settings().clipboard_autostart
+}
+
+#[tauri::command]
+pub fn get_app_meta() -> Result<AppMeta, String> {
+    Ok(AppMeta {
+        version: env!("CARGO_PKG_VERSION").to_string(),
+        release_time: option_env!("GITMEMO_RELEASE_TIME").unwrap_or("").to_string(),
+        requires_cli: false,
+        recommended_cli_version: env!("CARGO_PKG_VERSION").to_string(),
+    })
 }
 
 #[tauri::command]

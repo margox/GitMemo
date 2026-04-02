@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Lightbulb, ChevronLeft } from "lucide-react";
+import { ask } from "@tauri-apps/plugin-dialog";
+import { Lightbulb, ChevronLeft, Trash2 } from "lucide-react";
 import MarkdownView from "../components/MarkdownView";
 import { CopyPathButton } from "../components/CopyPathButton";
 import { useResizablePanel } from "../hooks/useResizablePanel";
 import { useRelativeTimeTick } from "../hooks/useRelativeTimeTick";
 import { relativeTime } from "../utils/time";
 import { useI18n } from "../hooks/useI18n";
+import { useToast } from "../hooks/useToast";
 
 interface FileEntry {
   name: string;
@@ -19,6 +21,7 @@ interface FileEntry {
 
 export default function PlansPage({ onFocusSidebar: _onFocusSidebar, enterTrigger: _enterTrigger }: { onFocusSidebar?: () => void; enterTrigger?: number } = {}) {
   const { t } = useI18n();
+  const { showToast } = useToast();
   useRelativeTimeTick();
   const panel = useResizablePanel("plans", 300);
   const [files, setFiles] = useState<FileEntry[]>([]);
@@ -58,15 +61,44 @@ export default function PlansPage({ onFocusSidebar: _onFocusSidebar, enterTrigge
     if (idx < files.length - 1) openFile(files[idx + 1].path);
   }, [selectedFile, files]);
 
+  const handleDelete = useCallback(async () => {
+    if (!selectedFile) return;
+    const confirmed = await ask(t("plans.deleteConfirm"), { title: t("common.confirm"), kind: "warning" });
+    if (!confirmed) return;
+    try {
+      const current = selectedFile;
+      const deleteSource = await ask(t("plans.deleteSourceConfirm"), {
+        title: t("plans.deleteSource"),
+        kind: "warning",
+      });
+      await invoke("delete_plan", { filePath: current, deleteSource });
+      const remaining = files.filter((f) => f.path !== current);
+      setFiles(remaining);
+      setSelectedFile(null);
+      setFileContent("");
+      showToast(t("plans.deleted"));
+      if (remaining.length > 0) {
+        const next = remaining[0];
+        void openFile(next.path);
+      }
+    } catch (e) {
+      showToast(`Error: ${e}`, true);
+    }
+  }, [selectedFile, files, t, showToast]);
+
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
       if (e.key === "ArrowUp") { e.preventDefault(); navPrev(); }
       if (e.key === "ArrowDown") { e.preventDefault(); navNext(); }
+      if ((e.metaKey || e.ctrlKey) && (e.key === "Backspace" || e.key === "Delete")) {
+        e.preventDefault();
+        void handleDelete();
+      }
     };
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [navPrev, navNext]);
+  }, [navPrev, navNext, handleDelete]);
 
   return (
     <div style={{ display: "flex", height: "100%" }}>
@@ -159,6 +191,13 @@ export default function PlansPage({ onFocusSidebar: _onFocusSidebar, enterTrigge
                 {selectedFile}
               </span>
               {selectedFile ? <CopyPathButton relPath={selectedFile} /> : null}
+              <button
+                onClick={() => void handleDelete()}
+                style={{ padding: 4, borderRadius: 4, background: "none", border: "none", cursor: "pointer", color: "var(--red)" }}
+                title={t("plans.delete")}
+              >
+                <Trash2 size={13} />
+              </button>
             </div>
             <div style={{ flex: 1, overflowY: "auto", padding: "20px 28px", userSelect: "text" }}>
               <MarkdownView content={fileContent} filePath={selectedFile ?? undefined} />

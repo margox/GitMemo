@@ -91,6 +91,8 @@ cargo install --path .
 
 </details>
 
+> Desktop releases are currently macOS-only (`.dmg` / `.app.tar.gz`). CI still runs Rust tests on Ubuntu and macOS, but packaged desktop artifacts are only produced for macOS for now.
+
 ### Initialize
 
 ```bash
@@ -115,6 +117,16 @@ Follow the prompts: choose your editor, enter your Git remote URL (or press Ente
 ### That's It
 
 Your AI conversations will now auto-save to the Git repo. Try typing `/save` in Claude — it works without restarting. If it doesn't take effect, restart your editor session.
+
+### Desktop App
+
+After `gitmemo init`, open GitMemo Desktop and it will read the same sync directory as the CLI (usually `~/.gitmemo`).
+
+- Dashboard shows sync direction (`ahead` / `behind`) instead of only "synced"
+- Search, notes, plans, clipboard, and Claude config all read from the same GitMemo data root
+- Plans created by Claude Code and Cursor are both imported into `plans/`
+- Current desktop packages target macOS only
+- Desktop does not require a separately installed CLI binary at runtime; the CLI is only needed for commands like `gitmemo init`
 
 ### How Conversations Are Saved
 

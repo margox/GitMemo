@@ -1,5 +1,15 @@
 use gitmemo_core::storage::{database, files, git};
 use serde::Serialize;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+use super::notes;
+
+static LAST_REMOTE_REFRESH_AT: AtomicU64 = AtomicU64::new(0);
+const REMOTE_REFRESH_INTERVAL_SECS: u64 = 30;
+
+fn local_timestamp(now: &chrono::DateTime<chrono::Local>) -> String {
+    now.to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
+}
 
 #[derive(Debug, Serialize)]
 pub struct AppStats {
@@ -20,9 +30,11 @@ pub struct AppStatus {
     pub git_remote: String,
     pub git_branch: String,
     pub unpushed: usize,
+    pub behind: usize,
     pub last_commit_id: String,
     pub last_commit_msg: String,
     pub last_commit_time: String,
+    pub checked_at: String,
 }
 
 #[tauri::command]
@@ -31,6 +43,7 @@ pub fn get_stats() -> Result<AppStats, String> {
     if !sync_dir.exists() {
         return Err("GitMemo 未初始化".into());
     }
+    notes::sync_external_plans_to_gitmemo(&sync_dir);
 
     let db_path = sync_dir.join(".metadata").join("index.db");
     let conn = database::open_or_create(&db_path).map_err(|e| e.to_string())?;
@@ -45,7 +58,8 @@ pub fn get_stats() -> Result<AppStats, String> {
         .map(|m| m.len())
         .sum();
 
-    let unpushed = git::unpushed_count(&sync_dir).unwrap_or(0);
+    maybe_refresh_remote(&sync_dir);
+    let unpushed = git::ahead_behind(&sync_dir).map(|(ahead, _)| ahead).unwrap_or(0);
 
     let clips = {
         let clips_dir = sync_dir.join("clips");
@@ -97,9 +111,11 @@ pub fn get_status() -> Result<AppStatus, String> {
             git_remote: String::new(),
             git_branch: String::new(),
             unpushed: 0,
+            behind: 0,
             last_commit_id: String::new(),
             last_commit_msg: String::new(),
             last_commit_time: String::new(),
+            checked_at: String::new(),
         });
     }
 
@@ -113,10 +129,12 @@ pub fn get_status() -> Result<AppStatus, String> {
         (String::new(), String::new())
     };
 
-    let unpushed = git::unpushed_count(&sync_dir).unwrap_or(0);
+    maybe_refresh_remote(&sync_dir);
+    let (unpushed, behind) = git::ahead_behind(&sync_dir).unwrap_or((0, 0));
 
     // Get last commit info
     let (last_commit_id, last_commit_msg, last_commit_time) = get_last_commit(&sync_dir);
+    let checked_at = local_timestamp(&chrono::Local::now());
 
     Ok(AppStatus {
         initialized: true,
@@ -124,15 +142,38 @@ pub fn get_status() -> Result<AppStatus, String> {
         git_remote: remote,
         git_branch: branch,
         unpushed,
+        behind,
         last_commit_id,
         last_commit_msg,
         last_commit_time,
+        checked_at,
     })
+}
+
+fn maybe_refresh_remote(sync_dir: &std::path::Path) {
+    if !git::has_remote(sync_dir) {
+        return;
+    }
+
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let last = LAST_REMOTE_REFRESH_AT.load(Ordering::SeqCst);
+    if now.saturating_sub(last) < REMOTE_REFRESH_INTERVAL_SECS {
+        return;
+    }
+    if LAST_REMOTE_REFRESH_AT
+        .compare_exchange(last, now, Ordering::SeqCst, Ordering::SeqCst)
+        .is_ok()
+    {
+        let _ = git::fetch(sync_dir);
+    }
 }
 
 fn get_last_commit(repo_path: &std::path::Path) -> (String, String, String) {
     let output = std::process::Command::new("git")
-        .args(["log", "-1", "--format=%h|%s|%cd", "--date=format:%Y-%m-%d %H:%M:%S"])
+        .args(["log", "-1", "--format=%h|%s|%cI"])
         .current_dir(repo_path)
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped())

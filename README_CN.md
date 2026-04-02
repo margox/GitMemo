@@ -91,6 +91,8 @@ cargo install --path .
 
 </details>
 
+> 当前桌面端发布包仅提供 macOS（`.dmg` / `.app.tar.gz`）。CI 仍会在 Ubuntu 和 macOS 上跑 Rust 测试，但桌面端正式产物暂时只构建 macOS。
+
 ### 初始化
 
 ```bash
@@ -115,6 +117,16 @@ gitmemo init --path /path/to/your/repo
 ### 就这样
 
 你的 AI 对话将自动保存到 Git 仓库。试试在 Claude 中输入 `/save`，无需重启即可生效。如果未生效，重启编辑器会话即可。
+
+### Desktop 客户端
+
+执行 `gitmemo init` 后，打开 GitMemo Desktop，它会读取与 CLI 相同的同步目录（通常是 `~/.gitmemo`）。
+
+- 仪表盘会展示与远端的同步方向，而不再只显示“已同步”
+- 搜索、笔记、计划、剪贴板、Claude 配置都共享同一份 GitMemo 数据目录
+- Claude Code 和 Cursor 生成的 plans 都会导入到 `plans/`
+- 当前桌面端安装包仅支持 macOS
+- Desktop 运行时不依赖额外安装的 CLI 二进制；CLI 主要用于 `gitmemo init` 这类命令
 
 ### 对话如何保存
 

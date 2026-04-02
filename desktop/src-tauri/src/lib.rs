@@ -33,6 +33,8 @@ pub fn run() {
             notes::update_note,
             notes::delete_note,
             notes::delete_clip,
+            notes::delete_plan,
+            notes::save_pasted_attachment,
             // Search
             search::search_all,
             search::recent_conversations,
@@ -51,6 +53,7 @@ pub fn run() {
             // Git sync
             notes::sync_to_git,
             // Settings
+            settings::get_app_meta,
             settings::get_settings,
             settings::set_autostart,
             settings::set_clipboard_autostart,
@@ -75,8 +78,7 @@ pub fn run() {
             // --- System Tray ---
             let open_i = MenuItem::with_id(app, "open", "Open GitMemo", true, None::<&str>)?;
             let sync_i = MenuItem::with_id(app, "sync", "Sync to Git", true, None::<&str>)?;
-            let clip_i =
-                MenuItem::with_id(app, "clipboard", "Start Clipboard", true, None::<&str>)?;
+            let clip_i = MenuItem::with_id(app, "clipboard", "Clipboard", true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
             let menu = Menu::with_items(app, &[&open_i, &sync_i, &clip_i, &quit_i])?;
@@ -95,15 +97,20 @@ pub fn run() {
                     "sync" => {
                         let app_handle = app.clone();
                         std::thread::spawn(move || {
-                            let sync_dir = gitmemo_core::storage::files::sync_dir();
-                            let _ = gitmemo_core::storage::git::commit_and_push(
-                                &sync_dir,
-                                "auto: sync from tray",
-                            );
-                            let _ = app_handle.emit("tray-sync-done", "synced");
+                            let _ = app_handle.emit("git-sync-start", ());
+                            let payload = match notes::sync_to_git() {
+                                Ok(message) => notes::GitSyncEvent { ok: true, message },
+                                Err(message) => notes::GitSyncEvent { ok: false, message },
+                            };
+                            let _ = app_handle.emit("git-sync-end", &payload);
                         });
                     }
                     "clipboard" => {
+                        if clipboard::is_watching() {
+                            let _ = clipboard::stop_clipboard_watch();
+                        } else {
+                            let _ = clipboard::start_clipboard_watch(app.clone());
+                        }
                         let _ = app.emit("tray-toggle-clipboard", ());
                     }
                     "quit" => {

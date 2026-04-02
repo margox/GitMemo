@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { Search, MessageSquare, StickyNote, ChevronLeft, Clipboard, FileText, Settings, FolderInput } from "lucide-react";
 import MarkdownView from "../components/MarkdownView";
 import { useI18n } from "../hooks/useI18n";
+import { relativeTime } from "../utils/time";
 
 interface SearchResultItem {
   source_type: string;
@@ -11,6 +12,8 @@ interface SearchResultItem {
   snippet: string;
   date: string;
 }
+
+const SEARCH_STATE_KEY = "gitmemo-search-state";
 
 export default function SearchPage({ focusTrigger, openFilePath, onFileOpened }: { focusTrigger?: number; openFilePath?: string | null; onFileOpened?: () => void }) {
   const { t } = useI18n();
@@ -23,6 +26,27 @@ export default function SearchPage({ focusTrigger, openFilePath, onFileOpened }:
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
+    try {
+      const raw = sessionStorage.getItem(SEARCH_STATE_KEY);
+      if (!raw) return;
+      const saved = JSON.parse(raw) as {
+        query?: string;
+        results?: SearchResultItem[];
+        searched?: boolean;
+        selectedFile?: string | null;
+      };
+      setQuery(saved.query || "");
+      setResults(saved.results || []);
+      setSearched(Boolean(saved.searched));
+      if (saved.selectedFile) {
+        void openFile(saved.selectedFile);
+      }
+    } catch {
+      // Ignore invalid cached state.
+    }
+  }, []);
+
+  useEffect(() => {
     if (focusTrigger && inputRef.current) inputRef.current.focus();
   }, [focusTrigger]);
 
@@ -32,6 +56,15 @@ export default function SearchPage({ focusTrigger, openFilePath, onFileOpened }:
       onFileOpened?.();
     }
   }, [openFilePath]);
+
+  useEffect(() => {
+    sessionStorage.setItem(SEARCH_STATE_KEY, JSON.stringify({
+      query,
+      results,
+      searched,
+      selectedFile,
+    }));
+  }, [query, results, searched, selectedFile]);
 
   const handleSearch = async () => {
     if (!query.trim()) return;
@@ -91,7 +124,7 @@ export default function SearchPage({ focusTrigger, openFilePath, onFileOpened }:
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             onKeyDown={(e) => { if (e.key === "Enter") handleSearch(); }}
-            placeholder="Search conversations, notes, clips... (Cmd+K)"
+            placeholder={t("search.placeholder")}
             style={{
               width: "100%", paddingLeft: 42, paddingRight: 16, paddingTop: 12, paddingBottom: 12,
               borderRadius: 10, fontSize: 14, fontFamily: "inherit",
@@ -104,18 +137,18 @@ export default function SearchPage({ focusTrigger, openFilePath, onFileOpened }:
       {/* Results */}
       <div style={{ flex: 1, overflowY: "auto", padding: "0 28px 28px" }}>
         {loading ? (
-          <p style={{ fontSize: 13, color: "var(--text-secondary)", padding: "20px 0" }}>Searching...</p>
+          <p style={{ fontSize: 13, color: "var(--text-secondary)", padding: "20px 0" }}>{t("search.searching")}</p>
         ) : !searched ? (
           <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", paddingTop: 80 }}>
             <Search size={44} style={{ color: "var(--border)", marginBottom: 16 }} />
-            <p style={{ fontSize: 14, color: "var(--text-secondary)" }}>Full-text search across all your data</p>
-            <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 6 }}>Cmd+Shift+G to search from anywhere</p>
+            <p style={{ fontSize: 14, color: "var(--text-secondary)" }}>{t("search.emptyTitle")}</p>
+            <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 6 }}>{t("search.emptyHint")}</p>
           </div>
         ) : results.length === 0 ? (
-          <p style={{ fontSize: 13, color: "var(--text-secondary)", paddingTop: 16 }}>No results for "{query}"</p>
+          <p style={{ fontSize: 13, color: "var(--text-secondary)", paddingTop: 16 }}>{t("search.noResults", query)}</p>
         ) : (
           <>
-            <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 14 }}>{results.length} results</p>
+            <p style={{ fontSize: 12, color: "var(--text-secondary)", marginBottom: 14 }}>{t("search.results", String(results.length))}</p>
             <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
               {results.map((r, i) => (
                 <button
@@ -144,7 +177,7 @@ export default function SearchPage({ focusTrigger, openFilePath, onFileOpened }:
                       <StickyNote size={14} style={{ color: "var(--green)" }} />
                     )}
                     <span style={{ fontSize: 13, fontWeight: 600, flex: 1 }}>{r.title}</span>
-                    <span style={{ fontSize: 10, color: "var(--text-secondary)", flexShrink: 0 }}>{r.date}</span>
+                    <span style={{ fontSize: 10, color: "var(--text-secondary)", flexShrink: 0 }}>{relativeTime(r.date, t)}</span>
                   </div>
                   {r.snippet && (
                     <p style={{ fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5, marginTop: 4 }}>

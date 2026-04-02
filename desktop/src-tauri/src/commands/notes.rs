@@ -1,10 +1,14 @@
-use gitmemo_core::storage::{files, git};
+use gitmemo_core::storage::{database, files, git};
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::sync::OnceLock;
 use tauri::{AppHandle, Emitter};
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
+
+fn local_timestamp(now: &chrono::DateTime<chrono::Local>) -> String {
+    now.to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
+}
 
 pub fn set_app_handle(handle: AppHandle) {
     let _ = APP_HANDLE.set(handle);
@@ -14,10 +18,23 @@ fn sync_dir() -> PathBuf {
     files::sync_dir()
 }
 
+fn refresh_index(dir: &Path) {
+    let db_path = dir.join(".metadata").join("index.db");
+    if let Ok(conn) = database::open_or_create(&db_path) {
+        let _ = database::build_index(&conn, dir);
+    }
+}
+
 #[derive(Debug, Serialize)]
 pub struct NoteResult {
     pub success: bool,
     pub path: String,
+    pub message: String,
+}
+
+#[derive(Debug, Serialize)]
+pub struct GitSyncEvent {
+    pub ok: bool,
     pub message: String,
 }
 
@@ -33,6 +50,13 @@ pub struct FileEntry {
     pub modified_ts: i64,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub preview_image: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct SavedAttachment {
+    pub path: String,
+    pub markdown: String,
+    pub message: String,
 }
 
 fn frontmatter_value<'a>(content: &'a str, key: &str) -> Option<&'a str> {
@@ -84,11 +108,49 @@ fn bg_commit_and_push(msg: String) {
     }
     std::thread::spawn(move || {
         let dir = sync_dir();
-        let _ = git::commit_and_push(&dir, &msg);
+        let sync_event = match git::commit_and_push(&dir, &msg) {
+            Ok(result) if result.push_error.is_some() => GitSyncEvent {
+                ok: false,
+                message: result.push_error.unwrap_or_else(|| "push failed".into()),
+            },
+            Ok(result) if !git::has_remote(&dir) => GitSyncEvent {
+                ok: true,
+                message: if result.committed { "Saved locally".into() } else { "No changes".into() },
+            },
+            Ok(result) => GitSyncEvent {
+                ok: true,
+                message: if result.committed { "Synced".into() } else { "No changes".into() },
+            },
+            Err(e) => GitSyncEvent {
+                ok: false,
+                message: e.to_string(),
+            },
+        };
         if let Some(handle) = APP_HANDLE.get() {
-            let _ = handle.emit("git-sync-end", ());
+            let _ = handle.emit("git-sync-end", &sync_event);
         }
     });
+}
+
+fn run_full_sync(dir: &std::path::Path) -> Result<String, String> {
+    // Copy plans from editor workspaces to plans/
+    sync_external_plans_to_gitmemo(dir);
+
+    // Sync Claude config (memory, skills, CLAUDE.md) to claude-config/
+    sync_claude_config(dir);
+
+    let result = git::commit_and_push(dir, "auto: sync from desktop").map_err(|e| e.to_string())?;
+    if result.committed && result.pushed {
+        Ok("已同步到 Git".into())
+    } else if result.committed {
+        if let Some(err) = result.push_error {
+            Err(format!("推送失败: {}", err))
+        } else {
+            Ok("已提交".into())
+        }
+    } else {
+        Ok("无新变更".into())
+    }
 }
 
 #[tauri::command]
@@ -99,6 +161,7 @@ pub fn create_note(content: String) -> Result<NoteResult, String> {
     }
 
     let rel_path = files::create_scratch(&dir, &content).map_err(|e| e.to_string())?;
+    refresh_index(&dir);
     bg_commit_and_push(format!("note: {}", content.chars().take(50).collect::<String>()));
 
     Ok(NoteResult {
@@ -116,6 +179,7 @@ pub fn append_daily(content: String) -> Result<NoteResult, String> {
     }
 
     let rel_path = files::append_daily(&dir, &content).map_err(|e| e.to_string())?;
+    refresh_index(&dir);
     bg_commit_and_push(format!("daily: {}", content.chars().take(50).collect::<String>()));
 
     Ok(NoteResult {
@@ -134,6 +198,7 @@ pub fn create_manual(title: String, content: String, append: bool) -> Result<Not
 
     let rel_path =
         files::write_manual(&dir, &title, &content, append).map_err(|e| e.to_string())?;
+    refresh_index(&dir);
 
     let action = if append { "update" } else { "create" };
     bg_commit_and_push(format!("manual: {} {}", action, title));
@@ -186,6 +251,9 @@ pub fn resolve_sync_path(rel_path: String) -> Result<String, String> {
 #[tauri::command]
 pub fn list_files(folder: String) -> Result<Vec<FileEntry>, String> {
     let dir = sync_dir();
+    if folder == "plans" {
+        sync_external_plans_to_gitmemo(&dir);
+    }
     let target = dir.join(&folder);
 
     if !target.exists() {
@@ -255,7 +323,7 @@ pub fn list_files(folder: String) -> Result<Vec<FileEntry>, String> {
         let modified = modified_time
             .map(|t| {
                 let dt: chrono::DateTime<chrono::Local> = t.into();
-                dt.format("%Y-%m-%d %H:%M:%S").to_string()
+                local_timestamp(&dt)
             })
             .unwrap_or_default();
         let modified_ts = modified_time
@@ -298,6 +366,7 @@ pub fn update_note(file_path: String, content: String) -> Result<NoteResult, Str
     }
 
     std::fs::write(&full_path, &content).map_err(|e| e.to_string())?;
+    refresh_index(&dir);
     bg_commit_and_push(format!("edit: {}", file_path));
 
     Ok(NoteResult {
@@ -316,6 +385,7 @@ pub fn delete_note(file_path: String) -> Result<NoteResult, String> {
     }
 
     std::fs::remove_file(&full_path).map_err(|e| e.to_string())?;
+    refresh_index(&dir);
     bg_commit_and_push(format!("delete: {}", file_path));
 
     Ok(NoteResult {
@@ -367,6 +437,7 @@ pub fn delete_clip(file_path: String) -> Result<NoteResult, String> {
     }
 
     std::fs::remove_file(&full_path).map_err(|e| e.to_string())?;
+    refresh_index(&dir);
     bg_commit_and_push(format!("delete clip: {}", norm));
 
     Ok(NoteResult {
@@ -377,50 +448,181 @@ pub fn delete_clip(file_path: String) -> Result<NoteResult, String> {
 }
 
 #[tauri::command]
+pub fn delete_plan(file_path: String, delete_source: Option<bool>) -> Result<NoteResult, String> {
+    let dir = sync_dir();
+    let norm = file_path
+        .replace('\\', "/")
+        .trim_start_matches('/')
+        .to_string();
+    let delete_source = delete_source.unwrap_or(false);
+    if !norm.starts_with("plans/") || norm.contains("..") || !norm.ends_with(".md") {
+        return Err("Invalid plan path".into());
+    }
+
+    let full_path = dir.join(&norm);
+    if !full_path.is_file() {
+        return Err(format!("File not found: {}", file_path));
+    }
+    std::fs::remove_file(&full_path).map_err(|e| e.to_string())?;
+
+    if delete_source {
+        if let Some(name) = Path::new(&norm).file_name().map(|s| s.to_string_lossy().to_string()) {
+            if let Some(home) = std::env::var_os("HOME") {
+                for source_dir in external_plan_dirs(&PathBuf::from(home)) {
+                    let source_plan = source_dir.join(&name);
+                    if source_plan.is_file() {
+                        let _ = std::fs::remove_file(source_plan);
+                    }
+                }
+            }
+        }
+    }
+
+    bg_commit_and_push(format!("delete plan: {}", norm));
+    refresh_index(&dir);
+
+    Ok(NoteResult {
+        success: true,
+        path: norm,
+        message: "Plan deleted".into(),
+    })
+}
+
+fn sanitize_name(name: &str) -> String {
+    let s: String = name
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' || c == '_' || c == '.' {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect();
+    s.trim_matches('_').to_string()
+}
+
+fn ext_from_mime(mime: &str) -> &'static str {
+    match mime {
+        "image/png" => "png",
+        "image/jpeg" => "jpg",
+        "image/gif" => "gif",
+        "image/webp" => "webp",
+        "application/pdf" => "pdf",
+        "text/markdown" => "md",
+        "text/plain" => "txt",
+        _ => "bin",
+    }
+}
+
+#[tauri::command]
+pub fn save_pasted_attachment(
+    base64_data: String,
+    mime_type: String,
+    file_name: Option<String>,
+) -> Result<SavedAttachment, String> {
+    let sync_dir = sync_dir();
+    if !sync_dir.exists() {
+        return Err("GitMemo 未初始化".into());
+    }
+
+    let bytes = {
+        use base64::Engine;
+        base64::engine::general_purpose::STANDARD
+            .decode(base64_data.as_bytes())
+            .map_err(|e| e.to_string())?
+    };
+    if bytes.is_empty() {
+        return Err("Attachment is empty".into());
+    }
+
+    let now = chrono::Local::now();
+    let ext = file_name
+        .as_deref()
+        .and_then(|n| Path::new(n).extension().map(|e| e.to_string_lossy().to_string()))
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| ext_from_mime(&mime_type).to_string());
+    let stem = file_name
+        .as_deref()
+        .and_then(|n| Path::new(n).file_stem().map(|s| s.to_string_lossy().to_string()))
+        .filter(|s| !s.is_empty())
+        .unwrap_or_else(|| {
+            if mime_type.starts_with("image/") {
+                "pasted-image".to_string()
+            } else {
+                "pasted-file".to_string()
+            }
+        });
+    let stem = sanitize_name(&stem);
+    let file_name = format!("{}-{}.{}", now.format("%H-%M-%S"), stem, ext);
+
+    let (folder, markdown) = if mime_type.starts_with("image/") {
+        let date_dir = now.format("%Y-%m-%d").to_string();
+        let rel = format!("clips/{}/{}", date_dir, file_name);
+        let md = format!("![{}](/{} )", stem, rel).replace(" )", ")");
+        (rel, md)
+    } else {
+        let base_dir = if mime_type == "application/pdf" {
+            "imports/docs"
+        } else {
+            "imports/other"
+        };
+        let rel = format!("{}/{}-{}", base_dir, now.format("%Y%m%d"), file_name);
+        let md = format!("[{}](/{} )", stem, rel).replace(" )", ")");
+        (rel, md)
+    };
+
+    let full = sync_dir.join(&folder);
+    if let Some(parent) = full.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(&full, bytes).map_err(|e| e.to_string())?;
+
+    bg_commit_and_push(format!("attach: {}", folder));
+
+    Ok(SavedAttachment {
+        path: folder,
+        markdown,
+        message: "Attachment saved".into(),
+    })
+}
+
+#[tauri::command]
 pub fn sync_to_git() -> Result<String, String> {
     let dir = sync_dir();
     if !dir.exists() {
         return Err("GitMemo 未初始化".into());
     }
-
-    // Copy plans from ~/.claude/plans/ to plans/
-    copy_plans_to_gitmemo(&dir);
-
-    // Sync Claude config (memory, skills, CLAUDE.md) to claude-config/
-    sync_claude_config(&dir);
-
-    let result = git::commit_and_push(&dir, "auto: sync from desktop").map_err(|e| e.to_string())?;
-    if result.committed && result.pushed {
-        Ok("已同步到 Git".into())
-    } else if result.committed {
-        Ok(format!(
-            "已提交，推送失败: {}",
-            result.push_error.unwrap_or_default()
-        ))
-    } else {
-        Ok("无新变更".into())
-    }
+    run_full_sync(&dir)
 }
 
-/// Copy .md files from ~/.claude/plans/ to <gitmemo>/plans/
-fn copy_plans_to_gitmemo(dir: &std::path::Path) {
+fn external_plan_dirs(home: &Path) -> [PathBuf; 2] {
+    [
+        home.join(".claude").join("plans"),
+        home.join(".cursor").join("plans"),
+    ]
+}
+
+/// Copy editor-generated plan files into `<gitmemo>/plans/`.
+pub fn sync_external_plans_to_gitmemo(dir: &std::path::Path) {
     let home = match std::env::var("HOME").ok() {
         Some(h) => std::path::PathBuf::from(h),
         None => return,
     };
-    let plans_src = home.join(".claude").join("plans");
-    if !plans_src.is_dir() {
-        return;
-    }
     let plans_dst = dir.join("plans");
     let _ = std::fs::create_dir_all(&plans_dst);
 
-    if let Ok(entries) = std::fs::read_dir(&plans_src) {
-        for entry in entries.flatten() {
-            let path = entry.path();
-            if path.extension().map(|e| e == "md").unwrap_or(false) {
-                let dest = plans_dst.join(path.file_name().unwrap());
-                let _ = std::fs::copy(&path, &dest);
+    for plans_src in external_plan_dirs(&home) {
+        if !plans_src.is_dir() {
+            continue;
+        }
+        if let Ok(entries) = std::fs::read_dir(&plans_src) {
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.extension().map(|e| e == "md").unwrap_or(false) {
+                    let dest = plans_dst.join(path.file_name().unwrap());
+                    let _ = std::fs::copy(&path, &dest);
+                }
             }
         }
     }

@@ -1,28 +1,28 @@
 import { useI18n } from '../i18n'
 
 const features = [
-  'AI conversation backup',
-  'Clipboard capture',
-  'Git-native sync',
-  'MCP integration',
-  'Open source',
-  'App size',
-  'Price',
+  'cmp.features.aiBackup',
+  'cmp.features.clipboard',
+  'cmp.features.gitNative',
+  'cmp.features.mcp',
+  'cmp.features.openSource',
+  'cmp.features.appSize',
+  'cmp.features.price',
 ]
 
 type Status = 'yes' | 'no' | 'partial' | string
 
 interface Product {
-  name: string
+  nameKey: string
   highlight?: boolean
   values: Status[]
 }
 
 const products: Product[] = [
-  { name: 'Obsidian', values: ['no', 'no', 'partial', 'no', 'no', '~200MB', 'Free + $50/yr'] },
-  { name: 'Notion', values: ['no', 'no', 'no', 'no', 'no', 'Web', 'Free + $10/mo'] },
-  { name: 'Novi Notes', values: ['no', 'no', 'no', 'yes', 'no', '~30MB', '$12.99'] },
-  { name: 'GitMemo', highlight: true, values: ['yes', 'yes', 'yes', 'yes', 'yes', '~16MB', 'Free forever'] },
+  { nameKey: 'cmp.products.obsidian', values: ['no', 'no', 'partial', 'no', 'no', '~200MB', 'Free + $50/yr'] },
+  { nameKey: 'cmp.products.notion', values: ['no', 'no', 'no', 'no', 'no', 'Web', 'Free + $10/mo'] },
+  { nameKey: 'cmp.products.novi', values: ['no', 'no', 'no', 'yes', 'no', '~30MB', '$12.99'] },
+  { nameKey: 'cmp.products.gitmemo', highlight: true, values: ['yes', 'yes', 'yes', 'yes', 'yes', '~16MB', 'Free forever'] },
 ]
 
 function Cell({ value }: { value: Status }) {
@@ -48,8 +48,8 @@ export default function Comparison() {
               <tr className="border-b border-border">
                 <th className="text-left py-4 px-4 text-text-secondary font-medium">{t('cmp.feature')}</th>
                 {products.map((p) => (
-                  <th key={p.name} className={`py-4 px-4 font-semibold text-center ${p.highlight ? 'text-accent' : 'text-white'}`}>
-                    {p.name}
+                  <th key={p.nameKey} className={`py-4 px-4 font-semibold text-center ${p.highlight ? 'text-accent' : 'text-white'}`}>
+                    {t(p.nameKey)}
                   </th>
                 ))}
               </tr>
@@ -57,9 +57,9 @@ export default function Comparison() {
             <tbody>
               {features.map((feat, i) => (
                 <tr key={feat} className="border-b border-border/50">
-                  <td className="py-3 px-4 text-text-secondary">{feat}</td>
+                  <td className="py-3 px-4 text-text-secondary">{t(feat)}</td>
                   {products.map((p) => (
-                    <td key={p.name} className={`py-3 px-4 text-center ${p.highlight ? 'bg-[rgba(99,102,241,0.04)]' : ''}`}>
+                    <td key={p.nameKey} className={`py-3 px-4 text-center ${p.highlight ? 'bg-[rgba(99,102,241,0.04)]' : ''}`}>
                       <Cell value={p.values[i]} />
                     </td>
                   ))}

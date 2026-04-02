@@ -2,6 +2,10 @@ use anyhow::Result;
 use chrono::Local;
 use std::path::{Path, PathBuf};
 
+fn local_timestamp(now: &chrono::DateTime<Local>) -> String {
+    now.to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
+}
+
 /// Get the sync directory path
 pub fn sync_dir() -> PathBuf {
     dirs::home_dir()
@@ -64,7 +68,7 @@ pub fn create_scratch(base: &Path, content: &str) -> Result<String> {
 
     let md = format!(
         "---\ndate: {}\n---\n\n{}\n",
-        now.format("%Y-%m-%d %H:%M:%S"),
+        local_timestamp(&now),
         content
     );
 
@@ -124,10 +128,14 @@ pub fn write_manual(base: &Path, title: &str, content: &str, append: bool) -> Re
         existing.push_str(&format!("\n\n{}\n", content));
         std::fs::write(&full_path, existing)?;
     } else {
-        let now = Local::now().format("%Y-%m-%d").to_string();
+        let now = Local::now();
         let md = format!(
             "---\ntitle: {}\ncreated: {}\nupdated: {}\n---\n\n# {}\n\n{}\n",
-            title, now, now, title, content
+            title,
+            local_timestamp(&now),
+            local_timestamp(&now),
+            title,
+            content
         );
         std::fs::write(&full_path, md)?;
     }

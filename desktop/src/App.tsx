@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import Sidebar from "./components/Sidebar";
 import DropZone from "./components/DropZone";
 import NotesPage from "./pages/NotesPage";
@@ -56,7 +57,7 @@ function App() {
       const href = target.getAttribute("href");
       if (href && (href.startsWith("http://") || href.startsWith("https://"))) {
         e.preventDefault();
-        window.open(href);
+        void openUrl(href);
       }
     };
     document.addEventListener("click", handleClick);

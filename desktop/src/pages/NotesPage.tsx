@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, type ClipboardEvent, type Dispatch, type SetStateAction } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { Plus, FileText, Calendar, BookOpen, Send, ChevronLeft, Pencil, Save, Trash2, X } from "lucide-react";
@@ -22,6 +22,12 @@ interface FileEntry {
 interface NoteResult {
   success: boolean;
   path: string;
+  message: string;
+}
+
+interface SavedAttachment {
+  path: string;
+  markdown: string;
   message: string;
 }
 
@@ -67,15 +73,55 @@ export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSideba
     if (idx < files.length - 1) openFile(files[idx + 1].path);
   }, [selectedFile, files]);
 
-  useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
-      if (e.key === "ArrowUp") { e.preventDefault(); navPrev(); }
-      if (e.key === "ArrowDown") { e.preventDefault(); navNext(); }
-    };
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [navPrev, navNext]);
+  const appendAttachmentMarkdown = useCallback(
+    (setter: Dispatch<SetStateAction<string>>, markdown: string) => {
+      setter((prev) => {
+        if (!prev.trim()) return markdown;
+        const needsBreak = !prev.endsWith("\n");
+        return `${prev}${needsBreak ? "\n" : ""}\n${markdown}`;
+      });
+    },
+    [],
+  );
+
+  const arrayBufferToBase64 = useCallback((buffer: ArrayBuffer) => {
+    const bytes = new Uint8Array(buffer);
+    let binary = "";
+    for (const byte of bytes) binary += String.fromCharCode(byte);
+    return btoa(binary);
+  }, []);
+
+  const saveAttachment = useCallback(async (file: File) => {
+    const base64 = arrayBufferToBase64(await file.arrayBuffer());
+    return invoke<SavedAttachment>("save_pasted_attachment", {
+      base64Data: base64,
+      mimeType: file.type || "application/octet-stream",
+      fileName: file.name || null,
+    });
+  }, [arrayBufferToBase64]);
+
+  const handlePasteAttachments = useCallback(async (
+    e: ClipboardEvent<HTMLTextAreaElement>,
+    setter: Dispatch<SetStateAction<string>>,
+  ) => {
+    const files = Array.from(e.clipboardData.items)
+      .filter((item) => item.kind === "file")
+      .map((item) => item.getAsFile())
+      .filter((file): file is File => file !== null);
+
+    if (files.length === 0) return;
+
+    e.preventDefault();
+    try {
+      for (const file of files) {
+        const saved = await saveAttachment(file);
+        appendAttachmentMarkdown(setter, saved.markdown);
+        showToast(saved.message);
+      }
+    } catch (err) {
+      showToast(`Error: ${err}`, true);
+    }
+  }, [appendAttachmentMarkdown, saveAttachment, showToast]);
 
   useEffect(() => {
     loadFiles();
@@ -162,6 +208,24 @@ export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSideba
     setTimeout(() => editRef.current?.focus(), 50);
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.target instanceof HTMLTextAreaElement || e.target instanceof HTMLInputElement) return;
+      if (e.key === "ArrowUp") { e.preventDefault(); navPrev(); }
+      if (e.key === "ArrowDown") { e.preventDefault(); navNext(); }
+      if (!editing && selectedFile && (e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "e") {
+        e.preventDefault();
+        startEdit();
+      }
+      if (!editing && selectedFile && (e.metaKey || e.ctrlKey) && (e.key === "Backspace" || e.key === "Delete")) {
+        e.preventDefault();
+        void handleDelete();
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [navPrev, navNext, editing, selectedFile, handleDelete, fileContent]);
+
   return (
     <div style={{ display: "flex", height: "100%" }}>
       {/* Left Panel - File List */}
@@ -217,6 +281,7 @@ export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSideba
               ref={textareaRef}
               value={newNote}
               onChange={(e) => setNewNote(e.target.value)}
+              onPaste={(e) => void handlePasteAttachments(e, setNewNote)}
               onCompositionStart={() => { imeComposingRef.current = true; }}
               onCompositionEnd={() => { imeComposingRef.current = false; }}
               onKeyDown={(e) => {
@@ -354,6 +419,7 @@ export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSideba
                   ref={editRef}
                   value={editContent}
                   onChange={(e) => setEditContent(e.target.value)}
+                  onPaste={(e) => void handlePasteAttachments(e, setEditContent)}
                   onKeyDown={(e) => {
                     if (e.key === "s" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); handleSaveEdit(); }
                     if (e.key === "Escape") setEditing(false);

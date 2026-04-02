@@ -1,6 +1,8 @@
 use gitmemo_core::storage::{database, files};
 use serde::Serialize;
 
+use super::notes;
+
 #[derive(Debug, Serialize)]
 pub struct SearchResultItem {
     pub source_type: String,
@@ -20,6 +22,7 @@ pub fn search_all(
     if !sync_dir.exists() {
         return Err("GitMemo 未初始化".into());
     }
+    notes::sync_external_plans_to_gitmemo(&sync_dir);
 
     let db_path = sync_dir.join(".metadata").join("index.db");
     let conn = database::open_or_create(&db_path).map_err(|e| e.to_string())?;
@@ -48,6 +51,7 @@ pub fn recent_conversations(limit: Option<usize>, days: Option<u32>) -> Result<V
     if !sync_dir.exists() {
         return Err("GitMemo 未初始化".into());
     }
+    notes::sync_external_plans_to_gitmemo(&sync_dir);
 
     let db_path = sync_dir.join(".metadata").join("index.db");
     let conn = database::open_or_create(&db_path).map_err(|e| e.to_string())?;
@@ -74,6 +78,7 @@ pub fn reindex() -> Result<u32, String> {
     if !sync_dir.exists() {
         return Err("GitMemo 未初始化".into());
     }
+    notes::sync_external_plans_to_gitmemo(&sync_dir);
 
     let db_path = sync_dir.join(".metadata").join("index.db");
     if db_path.exists() {
@@ -92,6 +97,7 @@ pub fn fuzzy_search_files(query: String, limit: Option<usize>) -> Result<Vec<Sea
     if !sync_dir.exists() {
         return Err("GitMemo not initialized".into());
     }
+    notes::sync_external_plans_to_gitmemo(&sync_dir);
 
     let max = limit.unwrap_or(10);
     let query_lower = query.to_lowercase();
@@ -142,7 +148,7 @@ pub fn fuzzy_search_files(query: String, limit: Option<usize>) -> Result<Vec<Sea
                 .and_then(|m| m.modified().ok())
                 .map(|t| {
                     let dt: chrono::DateTime<chrono::Local> = t.into();
-                    dt.format("%Y-%m-%d").to_string()
+                    dt.to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
                 })
                 .unwrap_or_default();
 

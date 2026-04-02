@@ -2,6 +2,10 @@ use gitmemo_core::storage::{files, git};
 use serde::Serialize;
 use std::path::Path;
 
+fn local_timestamp(now: &chrono::DateTime<chrono::Local>) -> String {
+    now.to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
+}
+
 /// Supported file type categories for routing
 #[derive(Debug, Clone, Serialize)]
 pub enum FileCategory {
@@ -125,7 +129,7 @@ fn import_single_file(
                 let md = format!(
                     "---\ntitle: {}\ndate: {}\nsource: import\noriginal: {}\n---\n\n{}\n",
                     title,
-                    now.format("%Y-%m-%d %H:%M:%S"),
+                    local_timestamp(&now),
                     filename,
                     content
                 );
@@ -170,7 +174,7 @@ fn import_single_file(
             let md = format!(
                 "---\ntitle: {}\ndate: {}\nsource: import\nlanguage: {}\noriginal: {}\n---\n\n# {}\n\n```{}\n{}\n```\n",
                 title,
-                now.format("%Y-%m-%d %H:%M:%S"),
+                local_timestamp(&now),
                 lang,
                 filename,
                 title,
@@ -198,7 +202,7 @@ fn import_single_file(
                 let md_full = sync_dir.join(&md_path);
                 let md = format!(
                     "---\ndate: {}\nsource: import\ntype: image\n---\n\n![{}]({})\n",
-                    now.format("%Y-%m-%d %H:%M:%S"),
+                    local_timestamp(&now),
                     filename,
                     filename
                 );
@@ -215,8 +219,7 @@ fn import_single_file(
     })
 }
 
-#[tauri::command]
-pub fn import_files(paths: Vec<String>) -> Result<ImportResult, String> {
+pub fn import_paths(paths: Vec<String>) -> Result<ImportResult, String> {
     let sync_dir = files::sync_dir();
     if !sync_dir.exists() {
         return Err("GitMemo 未初始化".into());
@@ -272,4 +275,9 @@ pub fn import_files(paths: Vec<String>) -> Result<ImportResult, String> {
         imported,
         errors,
     })
+}
+
+#[tauri::command]
+pub fn import_files(paths: Vec<String>) -> Result<ImportResult, String> {
+    import_paths(paths)
 }

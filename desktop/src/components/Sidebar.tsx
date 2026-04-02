@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { invoke } from "@tauri-apps/api/core";
 import {
   LayoutDashboard,
   MessageSquare,
@@ -21,6 +23,11 @@ interface SidebarProps {
   onSync: () => void;
 }
 
+interface AppMeta {
+  version: string;
+  release_time: string;
+}
+
 const navItems: { id: Page; icon: typeof LayoutDashboard; labelKey: string }[] = [
   { id: "dashboard", icon: LayoutDashboard, labelKey: "nav.dashboard" },
   { id: "search", icon: Search, labelKey: "nav.search" },
@@ -34,6 +41,11 @@ const navItems: { id: Page; icon: typeof LayoutDashboard; labelKey: string }[] =
 
 export default function Sidebar({ currentPage, onNavigate, focused, syncing, syncMsg, onSync }: SidebarProps) {
   const { t } = useI18n();
+  const [appMeta, setAppMeta] = useState<AppMeta | null>(null);
+
+  useEffect(() => {
+    invoke<AppMeta>("get_app_meta").then(setAppMeta).catch(() => {});
+  }, []);
 
   return (
     <div
@@ -126,7 +138,10 @@ export default function Sidebar({ currentPage, onNavigate, focused, syncing, syn
           {syncing ? t("sidebar.syncing") : syncMsg ? syncMsg : t("sidebar.syncToGit")}
         </button>
         <p style={{ fontSize: 10, textAlign: "center", marginTop: 8, color: "var(--text-secondary)", opacity: 0.6 }}>
-          GitMemo Desktop v0.2.0
+          GitMemo Desktop v{appMeta?.version ?? "—"}
+        </p>
+        <p style={{ fontSize: 9, textAlign: "center", marginTop: 4, color: "var(--text-secondary)", opacity: 0.5 }}>
+          {appMeta?.release_time || t("settings.releaseTimeUnknown")}
         </p>
       </div>
     </div>
