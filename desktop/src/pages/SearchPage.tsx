@@ -1,8 +1,11 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Search, MessageSquare, StickyNote, ChevronLeft, Clipboard, FileText, Settings, FolderInput } from "lucide-react";
+import { ask } from "@tauri-apps/plugin-dialog";
+import { Search, MessageSquare, StickyNote, ChevronLeft, Clipboard, FileText, Settings, FolderInput, Pencil, Save, X, Trash2 } from "lucide-react";
 import MarkdownView from "../components/MarkdownView";
+import { CopyPathButton } from "../components/CopyPathButton";
 import { useI18n } from "../hooks/useI18n";
+import { useToast } from "../hooks/useToast";
 import { relativeTime } from "../utils/time";
 
 interface SearchResultItem {
@@ -17,13 +20,17 @@ const SEARCH_STATE_KEY = "gitmemo-search-state";
 
 export default function SearchPage({ focusTrigger, openFilePath, onFileOpened }: { focusTrigger?: number; openFilePath?: string | null; onFileOpened?: () => void }) {
   const { t } = useI18n();
+  const { showToast } = useToast();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<SearchResultItem[]>([]);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [editContent, setEditContent] = useState("");
   const inputRef = useRef<HTMLInputElement>(null);
+  const editRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     try {
@@ -82,7 +89,45 @@ export default function SearchPage({ focusTrigger, openFilePath, onFileOpened }:
       const content = await invoke<string>("read_file", { filePath: path });
       setSelectedFile(path);
       setFileContent(content);
+      setEditing(false);
+      setEditContent("");
     } catch (e) { console.error(e); }
+  };
+
+  const startEdit = useCallback(() => {
+    if (!selectedFile) return;
+    setEditing(true);
+    setEditContent(fileContent);
+    window.setTimeout(() => editRef.current?.focus(), 0);
+  }, [selectedFile, fileContent]);
+
+  const handleSaveEdit = useCallback(async () => {
+    if (!selectedFile) return;
+    try {
+      await invoke("update_note", { filePath: selectedFile, content: editContent });
+      setFileContent(editContent);
+      setEditing(false);
+      setEditContent("");
+      showToast(t("conversations.saved"));
+    } catch (e) {
+      showToast(`Error: ${e}`, true);
+    }
+  }, [selectedFile, editContent, showToast, t]);
+
+  const handleDelete = async () => {
+    if (!selectedFile) return;
+    const confirmed = await ask(t("conversations.deleteConfirm"), { title: t("common.confirm"), kind: "warning" });
+    if (!confirmed) return;
+    try {
+      await invoke("delete_note", { filePath: selectedFile });
+      setResults((prev) => prev.filter((r) => r.file_path !== selectedFile));
+      setSelectedFile(null);
+      setFileContent("");
+      setEditing(false);
+      showToast(t("conversations.deleted"));
+    } catch (e) {
+      showToast(`Error: ${e}`, true);
+    }
   };
 
   if (selectedFile) {
@@ -93,17 +138,90 @@ export default function SearchPage({ focusTrigger, openFilePath, onFileOpened }:
           padding: "12px 20px", borderBottom: "1px solid var(--border)",
         }}>
           <button
-            onClick={() => { setSelectedFile(null); setFileContent(""); }}
+            onClick={() => { setSelectedFile(null); setFileContent(""); setEditing(false); setEditContent(""); }}
             style={{ padding: 4, borderRadius: 4, background: "none", border: "none", cursor: "pointer", color: "var(--text-secondary)" }}
           >
             <ChevronLeft size={16} />
           </button>
-          <span style={{ fontSize: 12, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+          <span style={{ flex: 1, fontSize: 12, color: "var(--text-secondary)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
             {selectedFile}
           </span>
+          {selectedFile ? <CopyPathButton relPath={selectedFile} /> : null}
+          <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+            {editing ? (
+              <>
+                <button
+                  onClick={() => { setEditing(false); setEditContent(""); }}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 4, padding: "5px 10px",
+                    borderRadius: 6, fontSize: 12, cursor: "pointer",
+                    background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text-secondary)",
+                  }}
+                  title={t("common.cancel")}
+                >
+                  <X size={12} />
+                </button>
+                <button
+                  onClick={() => void handleSaveEdit()}
+                  style={{
+                    display: "flex", alignItems: "center", gap: 4, padding: "5px 10px",
+                    borderRadius: 6, fontSize: 12, cursor: "pointer",
+                    background: "var(--bg)", border: "1px solid var(--border)", color: "var(--accent)",
+                  }}
+                  title={t("conversations.save")}
+                >
+                  <Save size={12} />
+                  {t("conversations.save")}
+                </button>
+              </>
+            ) : (
+              <button
+                onClick={startEdit}
+                style={{
+                  display: "flex", alignItems: "center", gap: 4, padding: "5px 10px",
+                  borderRadius: 6, fontSize: 12, cursor: "pointer",
+                  background: "var(--bg)", border: "1px solid var(--border)", color: "var(--text-secondary)",
+                }}
+                title={t("conversations.edit")}
+              >
+                <Pencil size={12} />
+                {t("conversations.edit")}
+              </button>
+            )}
+            <button
+              onClick={() => void handleDelete()}
+              style={{
+                padding: 6, borderRadius: 4, background: "none", border: "none",
+                cursor: "pointer", color: "var(--text-secondary)",
+              }}
+              title={t("common.delete")}
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
         </div>
-        <div style={{ flex: 1, overflowY: "auto", padding: "20px 28px" }}>
-          <MarkdownView content={fileContent} filePath={selectedFile ?? undefined} />
+        <div style={{ flex: 1, overflowY: "auto", padding: "20px 28px", userSelect: "text" }}>
+          {editing ? (
+            <textarea
+              ref={editRef}
+              value={editContent}
+              onChange={(e) => setEditContent(e.target.value)}
+              onKeyDown={(e) => {
+                if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "s") {
+                  e.preventDefault();
+                  void handleSaveEdit();
+                }
+              }}
+              style={{
+                width: "100%", height: "100%", resize: "none", padding: 0,
+                background: "transparent", border: "none", color: "var(--text)",
+                fontSize: 13, fontFamily: "ui-monospace, monospace", lineHeight: 1.7,
+                outline: "none",
+              }}
+            />
+          ) : (
+            <MarkdownView content={fileContent} filePath={selectedFile ?? undefined} />
+          )}
         </div>
       </div>
     );
