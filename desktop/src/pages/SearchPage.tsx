@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Search, MessageSquare, StickyNote, ChevronLeft, History, Clipboard, FileText, Settings, FolderInput } from "lucide-react";
+import { Search, MessageSquare, StickyNote, ChevronLeft, Clipboard, FileText, Settings, FolderInput } from "lucide-react";
 import MarkdownView from "../components/MarkdownView";
 import { useI18n } from "../hooks/useI18n";
 
@@ -132,8 +132,6 @@ export default function SearchPage({ focusTrigger, openFilePath, onFileOpened }:
                   <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                     {r.source_type === "conversation" ? (
                       <MessageSquare size={14} style={{ color: "var(--accent)" }} />
-                    ) : r.source_type === "session_log" ? (
-                      <History size={14} style={{ color: "var(--yellow)" }} />
                     ) : r.source_type === "clip" ? (
                       <Clipboard size={14} style={{ color: "var(--green)" }} />
                     ) : r.source_type === "plan" ? (

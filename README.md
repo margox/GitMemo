@@ -35,7 +35,7 @@ GitMemo doesn't run as a background service. It injects into your editor's nativ
 | `CLAUDE.md` instruction | Tells Claude to auto-save conversations as Markdown |
 | `settings.json` Hook | Auto `git commit && git push` after each file write |
 | `~/.claude/skills/save` | `/save` skill for explicit “save conversation” triggers |
-| `~/.claude/skills/gitmemo-session-log` | Same as Cursor: substantive Q&A summaries → `<sync>/Doc/会话记录/` |
+| `~/.claude/skills/gitmemo-session-log` | Same as Cursor: substantive Q&A summaries → `<sync>/conversations/YYYY-MM/` (same naming as auto-saved chats) |
 | MCP Server | Enables Claude to search history and create notes |
 
 **Cursor:**
@@ -44,7 +44,7 @@ GitMemo doesn't run as a background service. It injects into your editor's nativ
 |----------------|--------------|
 | `~/.cursor/rules/gitmemo.mdc` | Global Cursor rule (`alwaysApply: true`) — written on **every** `gitmemo init`, regardless of editor choice |
 | `~/.cursor/skills/save` | `/save` skill metadata for “save conversation” triggers |
-| `~/.cursor/skills/gitmemo-session-log` | Optional-style skill: save substantive Q&A summaries to `<sync>/Doc/会话记录/` (not the open project’s `Doc/`) |
+| `~/.cursor/skills/gitmemo-session-log` | Optional-style skill: save substantive Q&A summaries under `<sync>/conversations/YYYY-MM/` (same path rule as chats, not the open project repo) |
 | `cds_sync` MCP tool | AI calls this after saving to trigger git sync (only when you pick Cursor at init and omit `--no-mcp`) |
 | MCP Server | Enables AI to search history and create notes |
 
@@ -158,7 +158,7 @@ gitmemo uninstall          # Remove configs (keeps data)
 
 ```
 ~/.gitmemo/
-├── conversations/          # Auto-recorded AI conversations
+├── conversations/          # Auto-recorded AI chats + optional Q&A summaries (same `YYYY-MM` layout)
 │   └── 2026-03/
 │       └── 03-25-rust-async.md
 ├── notes/
@@ -167,8 +167,6 @@ gitmemo uninstall          # Remove configs (keeps data)
 │   └── scratch/            # Quick scratch notes
 ├── clips/                  # Auto-captured clipboard content
 │   └── 2026-03-25/
-├── Doc/
-│   └── 会话记录/           # Q&A session summaries (Cursor skill gitmemo-session-log)
 ├── plans/                  # Implementation plans from Plan Mode
 ├── imports/                # Drag-and-drop imported files
 ├── claude-config/          # Synced AI configuration backup

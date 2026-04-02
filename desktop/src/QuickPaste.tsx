@@ -14,7 +14,6 @@ import {
   Settings,
   RefreshCw,
   PanelLeft,
-  History,
   FolderInput,
 } from "lucide-react";
 import { useToast } from "./hooks/useToast";
@@ -63,8 +62,6 @@ function sourceIcon(sourceType: string) {
   switch (sourceType) {
     case "conversation":
       return <MessageSquare size={14} style={{ color: "var(--accent)" }} />;
-    case "session_log":
-      return <History size={14} style={{ color: "var(--yellow)" }} />;
     case "clip":
       return <Clipboard size={14} style={{ color: "var(--green)" }} />;
     case "plan":

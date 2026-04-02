@@ -351,8 +351,8 @@ impl I18n {
 
     pub fn cursor_session_log_skill_installed(&self) -> &str {
         match self.lang {
-            Lang::En => "Cursor session-log skill installed (~/.cursor/skills/gitmemo-session-log → Doc/会话记录 under sync dir)",
-            Lang::Zh => "已安装 Cursor 会话摘要技能（~/.cursor/skills/gitmemo-session-log → 同步目录下 Doc/会话记录）",
+            Lang::En => "Cursor session-log skill installed (~/.cursor/skills/gitmemo-session-log → conversations/YYYY-MM/ same as chats)",
+            Lang::Zh => "已安装 Cursor 会话摘要技能（路径与对话相同：conversations/年-月/）",
         }
     }
 

@@ -107,7 +107,6 @@ const INDEX_ROOTS: &[(&str, &str)] = &[
     ("notes/manual", "note"),
     ("notes/scratch", "note"),
     ("notes/imports", "note"),
-    ("Doc/会话记录", "session_log"),
     ("clips", "clip"),
     ("plans", "plan"),
     ("claude-config", "config"),
