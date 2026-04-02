@@ -32,6 +32,11 @@ interface ChatMessage {
   content: string;
 }
 
+interface ParsedConversationBody {
+  intro: string;
+  messages: ChatMessage[];
+}
+
 function parseFrontmatter(raw: string): { meta: ConversationMeta; body: string } {
   const meta: ConversationMeta = { title: "", date: "", model: "", messages: "" };
   // Must start with --- to have frontmatter
@@ -55,7 +60,7 @@ function parseFrontmatter(raw: string): { meta: ConversationMeta; body: string }
   return { meta, body };
 }
 
-function parseMessages(body: string): ChatMessage[] {
+function parseConversationBody(body: string): ParsedConversationBody {
   const msgs: ChatMessage[] = [];
   const pattern = /^### (User|Assistant)\s*(?:\(([^)]*)\))?\s*$/gm;
   const matches: { role: string; timestamp: string; index: number }[] = [];
@@ -69,6 +74,10 @@ function parseMessages(body: string): ChatMessage[] {
     });
   }
 
+  if (matches.length === 0) {
+    return { intro: body.trim(), messages: [] };
+  }
+
   for (let i = 0; i < matches.length; i++) {
     const start = body.indexOf("\n", matches[i].index) + 1;
     const end = i + 1 < matches.length ? matches[i + 1].index : body.length;
@@ -80,7 +89,10 @@ function parseMessages(body: string): ChatMessage[] {
     });
   }
 
-  return msgs;
+  return {
+    intro: body.slice(0, matches[0].index).trim(),
+    messages: msgs,
+  };
 }
 
 export default function ConversationsPage({ onFocusSidebar, enterTrigger, sidebarFocused }: { onFocusSidebar?: () => void; enterTrigger?: number; sidebarFocused?: boolean }) {
@@ -92,6 +104,7 @@ export default function ConversationsPage({ onFocusSidebar, enterTrigger, sideba
   const [metaCache, setMetaCache] = useState<Map<string, ConversationMeta>>(new Map());
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [introContent, setIntroContent] = useState("");
   const [rawContent, setRawContent] = useState("");
   const [rawBody, setRawBody] = useState("");
   const [currentMeta, setCurrentMeta] = useState<ConversationMeta | null>(null);
@@ -129,11 +142,13 @@ export default function ConversationsPage({ onFocusSidebar, enterTrigger, sideba
 
   const applyConversationRaw = useCallback((path: string, raw: string) => {
     const { meta, body } = parseFrontmatter(raw);
+    const parsed = parseConversationBody(body);
     setSelectedFile(path);
     setCurrentMeta(meta);
     setRawContent(raw);
     setRawBody(body);
-    setMessages(parseMessages(body));
+    setIntroContent(parsed.intro);
+    setMessages(parsed.messages);
   }, []);
 
   const openFile = useCallback(async (path: string) => {
@@ -191,6 +206,7 @@ export default function ConversationsPage({ onFocusSidebar, enterTrigger, sideba
       } else {
         setSelectedFile(null);
         setMessages([]);
+        setIntroContent("");
         setCurrentMeta(null);
         setRawBody("");
         setRawContent("");
@@ -229,6 +245,7 @@ export default function ConversationsPage({ onFocusSidebar, enterTrigger, sideba
         e.preventDefault();
         if (selectedFile) {
           setSelectedFile(null); setMessages([]); setCurrentMeta(null); setRawBody(""); setRawContent(""); setEditing(false);
+          setIntroContent("");
         } else {
           onFocusSidebar?.();
         }
@@ -459,33 +476,42 @@ export default function ConversationsPage({ onFocusSidebar, enterTrigger, sideba
                     outline: "none",
                   }}
                 />
-              ) : messages.length > 0 ? messages.map((msg, i) => (
-                <div
-                  key={i}
-                  style={{
-                    marginBottom: 20,
-                    padding: "14px 16px",
-                    borderRadius: 8,
-                    borderLeft: `3px solid ${msg.role === "user" ? "var(--accent)" : "var(--green)"}`,
-                    background: msg.role === "user" ? "var(--bg-hover)" : "transparent",
-                  }}
-                >
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    marginBottom: 10, fontSize: 11, fontWeight: 600,
-                  }}>
-                    <span style={{ color: msg.role === "user" ? "var(--accent)" : "var(--green)" }}>
-                      {msg.role === "user" ? t("conversations.user") : t("conversations.assistant")}
-                    </span>
-                    {msg.timestamp && (
-                      <span style={{ color: "var(--text-secondary)", fontWeight: 400 }}>
-                        {currentMeta?.date ? `${formatDateOnly(currentMeta.date)} ` : ""}{msg.timestamp}
-                      </span>
-                    )}
-                  </div>
-                  <MarkdownView content={msg.content} />
-                </div>
-              )) : (
+              ) : messages.length > 0 ? (
+                <>
+                  {introContent ? (
+                    <div style={{ marginBottom: 20 }}>
+                      <MarkdownView content={introContent} filePath={selectedFile ?? undefined} />
+                    </div>
+                  ) : null}
+                  {messages.map((msg, i) => (
+                    <div
+                      key={i}
+                      style={{
+                        marginBottom: 20,
+                        padding: "14px 16px",
+                        borderRadius: 8,
+                        borderLeft: `3px solid ${msg.role === "user" ? "var(--accent)" : "var(--green)"}`,
+                        background: msg.role === "user" ? "var(--bg-hover)" : "transparent",
+                      }}
+                    >
+                      <div style={{
+                        display: "flex", alignItems: "center", gap: 8,
+                        marginBottom: 10, fontSize: 11, fontWeight: 600,
+                      }}>
+                        <span style={{ color: msg.role === "user" ? "var(--accent)" : "var(--green)" }}>
+                          {msg.role === "user" ? t("conversations.user") : t("conversations.assistant")}
+                        </span>
+                        {msg.timestamp && (
+                          <span style={{ color: "var(--text-secondary)", fontWeight: 400 }}>
+                            {currentMeta?.date ? `${formatDateOnly(currentMeta.date)} ` : ""}{msg.timestamp}
+                          </span>
+                        )}
+                      </div>
+                      <MarkdownView content={msg.content} />
+                    </div>
+                  ))}
+                </>
+              ) : (
                 <MarkdownView content={rawBody} />
               )}
             </div>

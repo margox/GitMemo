@@ -51,6 +51,23 @@ messages: {{消息轮次数}}
 
 # {{对话标题}}
 
+> **提问**：{{本轮核心问题，尽量用用户原话}}
+
+---
+
+## 回答摘要
+{{结构化总结：做了什么判断、采用了什么方案、为什么这么做、有哪些风险/限制、后续建议}}
+
+## 关键结论
+- {{结论 1}}
+- {{结论 2}}
+
+## 涉及文件
+- `{{文件路径1}}`
+- `{{文件路径2}}`
+
+## 原始对话
+
 ### User (HH:MM:SS)
 {{用户消息}}
 
@@ -65,6 +82,9 @@ messages: {{消息轮次数}}
 - 标题从对话内容自动生成，中文不超过 20 字
 - 代码块保留原始格式和语言标记
 - 自动过滤 API Key、密码等敏感信息（替换为 `***`）
+- 对**分析 / 方案 / 实现 / 评审 / 排查**这类有长期价值的对话，优先补全 `提问 / 回答摘要 / 关键结论 / 涉及文件`
+- `涉及文件` 无内容时可省略；同一主题后续追问优先追加 `## 追加问答：{{小标题}}`
+- 避免机械转录，优先保留决策、结论、风险与文件路径；整篇尽量控制在约 300 行内
 - **时间**：`date` 须为带偏移的 ISO 8601（如 `2026-04-01T18:30:00+08:00`）；保存前在终端执行 `date +"%Y-%m-%dT%H:%M:%S%z"` 并规范偏移格式；勿写无偏移的 `YYYY-MM-DD HH:MM:SS`（易出现固定小时偏差）。小标题 `HH:MM:SS` 与 frontmatter 同日、同时区含义一致。
 
 **同步**：若在 Cursor 中已配置 GitMemo MCP，在写入上述目录下的文件后，应调用 `cds_sync` 将变更提交并推送到远程。
@@ -109,6 +129,23 @@ messages: {{message count}}
 
 # {{conversation title}}
 
+> **Question**: {{core user ask, preferably verbatim}}
+
+---
+
+## Summary
+{{Structured summary: what was decided, why, risks/limits, and next steps if relevant}}
+
+## Key Takeaways
+- {{takeaway 1}}
+- {{takeaway 2}}
+
+## Files Touched
+- `{{path/to/file1}}`
+- `{{path/to/file2}}`
+
+## Raw Conversation
+
 ### User (HH:MM:SS)
 {{user message}}
 
@@ -121,6 +158,9 @@ messages: {{message count}}
 - Save silently (do not announce that you saved)
 - Title from content, max ~60 characters (English) / concise Chinese
 - Preserve code fences and language tags; redact secrets as `***`
+- For substantive analysis / planning / implementation / review threads, prefer filling `Question / Summary / Key Takeaways / Files Touched`
+- `Files Touched` may be omitted if empty; use `## Follow-up: {{short title}}` for same-topic additions
+- Avoid exhaustive transcript dumps when the summary already captures the value; keep the file roughly under 300 lines
 - **Time**: `date` must be ISO 8601 **with offset** (e.g. `2026-04-01T18:30:00+02:00`). Before saving, run `date +"%Y-%m-%dT%H:%M:%S%z"` and normalize the offset to `±HH:MM`. Do not use bare `YYYY-MM-DD HH:MM:SS` (causes systematic offset bugs). Heading times must match the same local day/timezone intent as frontmatter.
 
 **Git sync**: If GitMemo MCP is enabled in Cursor, call `cds_sync` after writing files under `{sync_dir}/`.

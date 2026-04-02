@@ -1,7 +1,8 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
-import { Settings, Power, Clipboard, Sun, Moon, GitBranch, ExternalLink, Globe, FolderOpen, Globe2, Terminal } from "lucide-react";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { Settings, Power, Clipboard, Sun, Moon, GitBranch, ExternalLink, Globe, FolderOpen, Globe2, Terminal, Copy, Check } from "lucide-react";
 import type { Theme } from "../App";
 import { useI18n, type Locale } from "../hooks/useI18n";
 import { useToast } from "../hooks/useToast";
@@ -66,6 +67,7 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
   const [gitRemote, setGitRemote] = useState("");
   const [claudeEnabled, setClaudeEnabled] = useState(false);
   const [appMeta, setAppMeta] = useState<AppMeta | null>(null);
+  const [copiedField, setCopiedField] = useState<"syncDir" | "gitRemote" | null>(null);
 
   useEffect(() => {
     invoke<DesktopSettings>("get_settings").then(setSettings).catch(console.error);
@@ -122,6 +124,18 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
       setBranch(trimmed);
       setEditingBranch(false);
       showToast(msg);
+    } catch (e) {
+      showToast(`Error: ${e}`, true);
+    }
+  };
+
+  const copyValue = async (value: string, field: "syncDir" | "gitRemote") => {
+    if (!value) return;
+    try {
+      await writeText(value);
+      setCopiedField(field);
+      window.setTimeout(() => setCopiedField((current) => (current === field ? null : current)), 1500);
+      showToast(t("common.copied"));
     } catch (e) {
       showToast(`Error: ${e}`, true);
     }
@@ -292,12 +306,43 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
                 <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>{t("settings.dataDirDesc")}</p>
               </div>
             </div>
-            <span style={{
-              fontSize: 11, color: "var(--text-secondary)", fontFamily: "ui-monospace, monospace",
-              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200,
-            }} title={syncDir}>
-              {syncDir || "—"}
-            </span>
+            {syncDir ? (
+              <button
+                type="button"
+                onClick={() => void copyValue(syncDir, "syncDir")}
+                title={t("common.clickToCopy")}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  maxWidth: 240,
+                  padding: "4px 8px",
+                  borderRadius: 6,
+                  border: "1px solid var(--border)",
+                  background: "var(--bg)",
+                  color: "var(--text-secondary)",
+                  cursor: "pointer",
+                }}
+              >
+                {copiedField === "syncDir" ? <Check size={12} style={{ flexShrink: 0, color: "var(--green)" }} /> : <Copy size={12} style={{ flexShrink: 0 }} />}
+                <span style={{
+                  fontSize: 11,
+                  fontFamily: "ui-monospace, monospace",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }} title={syncDir}>
+                  {syncDir}
+                </span>
+              </button>
+            ) : (
+              <span style={{
+                fontSize: 11, color: "var(--text-secondary)", fontFamily: "ui-monospace, monospace",
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 200,
+              }}>
+                —
+              </span>
+            )}
           </div>
 
           <div style={{ borderTop: "1px solid var(--border)" }} />
@@ -311,12 +356,43 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
                 <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>{t("settings.remoteRepoDesc")}</p>
               </div>
             </div>
-            <span style={{
-              fontSize: 11, color: "var(--text-secondary)", fontFamily: "ui-monospace, monospace",
-              overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 300,
-            }} title={gitRemote}>
-              {gitRemote || t("settings.noRemote")}
-            </span>
+            {gitRemote ? (
+              <button
+                type="button"
+                onClick={() => void copyValue(gitRemote, "gitRemote")}
+                title={t("common.clickToCopy")}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 6,
+                  maxWidth: 340,
+                  padding: "4px 8px",
+                  borderRadius: 6,
+                  border: "1px solid var(--border)",
+                  background: "var(--bg)",
+                  color: "var(--text-secondary)",
+                  cursor: "pointer",
+                }}
+              >
+                {copiedField === "gitRemote" ? <Check size={12} style={{ flexShrink: 0, color: "var(--green)" }} /> : <Copy size={12} style={{ flexShrink: 0 }} />}
+                <span style={{
+                  fontSize: 11,
+                  fontFamily: "ui-monospace, monospace",
+                  overflow: "hidden",
+                  textOverflow: "ellipsis",
+                  whiteSpace: "nowrap",
+                }} title={gitRemote}>
+                  {gitRemote}
+                </span>
+              </button>
+            ) : (
+              <span style={{
+                fontSize: 11, color: "var(--text-secondary)", fontFamily: "ui-monospace, monospace",
+                overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 300,
+              }}>
+                {t("settings.noRemote")}
+              </span>
+            )}
           </div>
         </div>
       </div>

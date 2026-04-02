@@ -37,6 +37,23 @@ messages: {{消息轮次数}}
 
 # {{对话标题}}
 
+> **提问**：{{本轮核心问题，尽量用用户原话}}
+
+---
+
+## 回答摘要
+{{结构化总结：做了什么判断、采用了什么方案、为什么这么做、有哪些风险/限制、后续建议}}
+
+## 关键结论
+- {{结论 1}}
+- {{结论 2}}
+
+## 涉及文件
+- `{{文件路径1}}`
+- `{{文件路径2}}`
+
+## 原始对话
+
 ### User (HH:MM:SS)
 {{用户消息}}
 
@@ -51,6 +68,9 @@ messages: {{消息轮次数}}
 - 标题从对话内容自动生成，中文不超过 20 字
 - 代码块保留原始格式和语言标记
 - 自动过滤 API Key、密码等敏感信息（替换为 `***`）
+- 对**分析 / 方案 / 实现 / 评审 / 排查**这类有长期价值的对话，优先补全 `提问 / 回答摘要 / 关键结论 / 涉及文件`
+- `涉及文件` 无内容时可省略；同一主题后续追问优先追加 `## 追加问答：{{小标题}}`
+- 避免机械转录，优先保留决策、结论、风险与文件路径；整篇尽量控制在约 300 行内
 - **时间与时区（重要，避免固定偏差例如「慢 2 小时」）**：
   - `date` **必须**使用带显式偏移的 ISO 8601，例如 `2026-04-01T18:30:00+08:00` 或 `...Z`（仅当确为 UTC）。**禁止**再写无偏移的 `YYYY-MM-DD HH:MM:SS`（浏览器/模型常按 UTC 或歧义解析，会与用户本机钟差固定小时数）。
   - 保存前应用**用户机器上的真实本地时间**：在终端执行 `date +"%Y-%m-%dT%H:%M:%S%z"`，把 `%z` 规范成 `+08:00` 这种冒号形式后写入 `date`；小标题里的 `HH:MM:SS` 与 frontmatter 同一天内须一致、同一时区含义。
@@ -116,6 +136,23 @@ messages: {{message count}}
 
 # {{conversation title}}
 
+> **Question**: {{core user ask, preferably verbatim}}
+
+---
+
+## Summary
+{{Structured summary: what was decided, why, risks/limits, and next steps if relevant}}
+
+## Key Takeaways
+- {{takeaway 1}}
+- {{takeaway 2}}
+
+## Files Touched
+- `{{path/to/file1}}`
+- `{{path/to/file2}}`
+
+## Raw Conversation
+
 ### User (HH:MM:SS)
 {{user message}}
 
@@ -130,6 +167,9 @@ messages: {{message count}}
 - Auto-generate title from conversation content, max 60 characters
 - Preserve original format and language tags for code blocks
 - Auto-filter API Keys, passwords and other sensitive info (replace with `***`)
+- For substantive analysis / planning / implementation / review threads, prefer filling `Question / Summary / Key Takeaways / Files Touched`
+- `Files Touched` may be omitted if empty; use `## Follow-up: {{short title}}` for same-topic additions
+- Avoid exhaustive transcript dumps when the summary already captures the value; keep the file roughly under 300 lines
 - **Time & timezone (prevents systematic skew like “2 hours late”)**:
   - `date` **must** be ISO 8601 **with an explicit offset**, e.g. `2026-04-01T18:30:00+02:00` or `...Z` only if truly UTC. **Do not** use bare `YYYY-MM-DD HH:MM:SS` without offset (ambiguous; often interpreted as UTC or inconsistently vs the user’s machine).
   - Before saving, take wall time from the **user’s environment**: run `date +"%Y-%m-%dT%H:%M:%S%z"` in the terminal and normalize `%z` to `±HH:MM` for the `date` field; `HH:MM:SS` in headings must match the same local calendar day and timezone intent.
