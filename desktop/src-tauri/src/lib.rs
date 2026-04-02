@@ -81,11 +81,17 @@ pub fn run() {
             // --- System Tray ---
             let open_i = MenuItem::with_id(app, "open", "Open GitMemo", true, None::<&str>)?;
             let sync_i = MenuItem::with_id(app, "sync", "Sync to Git", true, None::<&str>)?;
-            let clip_i = MenuItem::with_id(app, "clipboard", "Clipboard", true, None::<&str>)?;
+            let clip_label = if settings::should_autostart_clipboard() {
+                "Clipboard: ON"
+            } else {
+                "Clipboard: OFF"
+            };
+            let clip_i = MenuItem::with_id(app, "clipboard", clip_label, true, None::<&str>)?;
             let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
             let menu = Menu::with_items(app, &[&open_i, &sync_i, &clip_i, &quit_i])?;
 
+            let clip_menu_item = clip_i.clone();
             let _tray = TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
                 .tooltip("GitMemo")
@@ -114,6 +120,8 @@ pub fn run() {
                         } else {
                             let _ = clipboard::start_clipboard_watch(app.clone());
                         }
+                        let label = if clipboard::is_watching() { "Clipboard: ON" } else { "Clipboard: OFF" };
+                        let _ = clip_menu_item.set_text(label);
                         let _ = app.emit("tray-toggle-clipboard", ());
                     }
                     "quit" => {

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, type ComponentProps } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { Search, ChevronUp, ChevronDown, X } from "lucide-react";
 
@@ -122,7 +123,7 @@ export default function MarkdownView({ content, filePath }: MarkdownViewProps) {
               }, 0);
             }}
             onKeyDown={(e) => {
-              if (e.key === "Enter") {
+              if (e.key === "Enter" && !e.nativeEvent.isComposing) {
                 e.preventDefault();
                 runFind(e.shiftKey);
               }
@@ -160,6 +161,21 @@ export default function MarkdownView({ content, filePath }: MarkdownViewProps) {
         remarkPlugins={[remarkGfm]}
         components={{
           img: (props) => <LocalImage {...props} filePath={filePath} />,
+          a: ({ href, children, ...rest }) => (
+            <a
+              {...rest}
+              href={href}
+              onClick={(e) => {
+                if (href && (href.startsWith("http://") || href.startsWith("https://"))) {
+                  e.preventDefault();
+                  void openUrl(href);
+                }
+              }}
+              style={{ cursor: "pointer" }}
+            >
+              {children}
+            </a>
+          ),
         }}
       >
         {body}

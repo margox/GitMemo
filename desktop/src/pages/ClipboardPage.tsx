@@ -95,7 +95,10 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
       loadSavedClips();
       loadStatus();
     });
-    return () => { unlisten.then((fn) => fn()); };
+    // Also refresh when window regains focus (catches clips saved while on other tabs)
+    const onFocus = () => { loadStatus(); loadSavedClips(); };
+    window.addEventListener("focus", onFocus);
+    return () => { unlisten.then((fn) => fn()); window.removeEventListener("focus", onFocus); };
   }, []);
 
   const loadStatus = async () => {

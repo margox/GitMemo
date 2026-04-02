@@ -306,7 +306,7 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
                 value={branchInput}
                 onChange={(e) => setBranchInput(e.target.value)}
                 onBlur={saveBranch}
-                onKeyDown={(e) => { if (e.key === "Enter") saveBranch(); if (e.key === "Escape") { setEditingBranch(false); setBranchInput(branch); } }}
+                onKeyDown={(e) => { if (e.key === "Enter" && !e.nativeEvent.isComposing) saveBranch(); if (e.key === "Escape") { setEditingBranch(false); setBranchInput(branch); } }}
                 style={{
                   width: 120, padding: "4px 8px", borderRadius: 4, fontSize: 12,
                   background: "var(--bg)", border: "1px solid var(--accent)", color: "var(--text)",

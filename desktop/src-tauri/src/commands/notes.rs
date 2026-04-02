@@ -133,6 +133,9 @@ fn bg_commit_and_push(msg: String) {
 }
 
 fn run_full_sync(dir: &std::path::Path) -> Result<String, String> {
+    // Pull latest from remote first (even if no local changes)
+    let pulled = git::pull(dir).unwrap_or(false);
+
     // Copy plans from editor workspaces to plans/
     sync_external_plans_to_gitmemo(dir);
 
@@ -151,6 +154,8 @@ fn run_full_sync(dir: &std::path::Path) -> Result<String, String> {
         } else {
             Ok("已提交".into())
         }
+    } else if pulled {
+        Ok("已拉取最新".into())
     } else {
         Ok("无新变更".into())
     }
