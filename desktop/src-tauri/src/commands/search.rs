@@ -31,7 +31,14 @@ pub fn search_all(
     let filter = type_filter.as_deref().unwrap_or("all");
     let max = limit.unwrap_or(20);
 
-    let results = database::search(&conn, &query, filter, max).map_err(|e| e.to_string())?;
+    // Try FTS first; if empty, fall back to LIKE-based search (better for CJK)
+    let fts_results = database::search(&conn, &query, filter, max).map_err(|e| e.to_string())?;
+
+    let results = if fts_results.is_empty() {
+        database::search_like(&conn, &query, filter, max).unwrap_or_default()
+    } else {
+        fts_results
+    };
 
     Ok(results
         .into_iter()

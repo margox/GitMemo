@@ -238,6 +238,69 @@ pub fn search(conn: &Connection, query: &str, type_filter: &str, limit: usize) -
     Ok(results)
 }
 
+/// LIKE-based search fallback for CJK and other languages where FTS5 unicode61 tokenizer fails.
+pub fn search_like(conn: &Connection, query: &str, type_filter: &str, limit: usize) -> Result<Vec<SearchResult>> {
+    let pattern = format!("%{}%", query);
+
+    let sql = if type_filter == "all" {
+        "SELECT d.source_type, d.title, d.file_path, si.content, d.created_at
+         FROM search_index si
+         JOIN documents d ON d.id = si.doc_id
+         WHERE si.title LIKE ?1 OR si.content LIKE ?1
+         ORDER BY d.created_at DESC
+         LIMIT ?2"
+            .to_string()
+    } else {
+        format!(
+            "SELECT d.source_type, d.title, d.file_path, si.content, d.created_at
+             FROM search_index si
+             JOIN documents d ON d.id = si.doc_id
+             WHERE (si.title LIKE ?1 OR si.content LIKE ?1) AND d.source_type = '{}'
+             ORDER BY d.created_at DESC
+             LIMIT ?2",
+            type_filter
+        )
+    };
+
+    let mut stmt = conn.prepare(&sql)?;
+    let results = stmt
+        .query_map(params![pattern, limit], |row| {
+            let content: String = row.get(3)?;
+            // Extract a snippet around the match
+            let snippet = extract_snippet(&content, query, 60);
+            Ok(SearchResult {
+                source_type: row.get(0)?,
+                title: row.get(1)?,
+                file_path: row.get(2)?,
+                snippet,
+                date: row.get(4)?,
+            })
+        })?
+        .filter_map(|r| r.ok())
+        .collect();
+
+    Ok(results)
+}
+
+/// Extract a short snippet around the first occurrence of `needle` in `haystack`.
+fn extract_snippet(haystack: &str, needle: &str, context_chars: usize) -> String {
+    // Flatten to single line for snippet display
+    let flat: String = haystack.chars().map(|c| if c == '\n' || c == '\r' { ' ' } else { c }).collect();
+    if let Some(pos) = flat.find(needle) {
+        let start = pos.saturating_sub(context_chars);
+        let end = (pos + needle.len() + context_chars).min(flat.len());
+        let mut snippet = String::new();
+        if start > 0 { snippet.push_str("..."); }
+        snippet.push_str(flat[start..end].trim());
+        if end < flat.len() { snippet.push_str("..."); }
+        snippet
+    } else {
+        // No direct match found, return beginning of content
+        let preview: String = flat.chars().take(120).collect();
+        if flat.len() > 120 { format!("{}...", preview.trim()) } else { preview.trim().to_string() }
+    }
+}
+
 /// List recent documents
 pub fn recent(conn: &Connection, limit: usize, days: u32) -> Result<Vec<SearchResult>> {
     let cutoff = chrono::Local::now() - chrono::Duration::days(days as i64);
