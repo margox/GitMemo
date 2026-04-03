@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { listen } from "@tauri-apps/api/event";
+import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
+import { notify } from "./utils/notify";
 import Sidebar from "./components/Sidebar";
 import DropZone from "./components/DropZone";
 import NotesPage from "./pages/NotesPage";
@@ -11,6 +13,7 @@ import SettingsPage from "./pages/SettingsPage";
 import ConversationsPage from "./pages/ConversationsPage";
 import PlansPage from "./pages/PlansPage";
 import ClaudeConfigPage from "./pages/ClaudeConfigPage";
+import { NotInitialized } from "./components/NotInitialized";
 import { useSync } from "./hooks/useSync";
 
 export type Page = "dashboard" | "conversations" | "notes" | "clipboard" | "search" | "plans" | "claude-config" | "settings";
@@ -22,9 +25,9 @@ function App() {
   const [currentPage, setCurrentPage] = useState<Page>("dashboard");
   const [focusTrigger, setFocusTrigger] = useState(0);
   const [sidebarFocused, setSidebarFocused] = useState(false);
-  // Incremented when user presses Right from sidebar → tells content page to select first item
   const [enterContentTrigger, setEnterContentTrigger] = useState(0);
   const [openFilePath, setOpenFilePath] = useState<string | null>(null);
+  const [initialized, setInitialized] = useState<boolean | null>(null);
   const sync = useSync();
   const [theme, setTheme] = useState<Theme>(() => {
     return (localStorage.getItem("gitmemo-theme") as Theme) || "dark";
@@ -33,6 +36,13 @@ function App() {
   const navigateAndFocus = useCallback((page: Page) => {
     setCurrentPage(page);
     setFocusTrigger((n) => n + 1);
+  }, []);
+
+  // Check initialization on mount
+  useEffect(() => {
+    invoke<{ initialized: boolean }>("get_status")
+      .then((st) => setInitialized(st.initialized))
+      .catch(() => setInitialized(false));
   }, []);
 
   const toggleTheme = useCallback(() => {
@@ -67,6 +77,9 @@ function App() {
   useEffect(() => {
     const unlistenSearch = listen("global-shortcut-search", () => navigateAndFocus("search"));
     const unlistenClip = listen("tray-toggle-clipboard", () => setCurrentPage("clipboard"));
+    const unlistenClipSaved = listen<{ preview: string }>("clipboard-saved", ({ payload }) => {
+      void notify("GitMemo Clipboard", payload?.preview || "Clip saved");
+    });
     const unlistenQuickPastePage = listen<{ page: Page | "sync" }>("quick-paste-open-page", ({ payload }) => {
       if (!payload) return;
       if (payload.page === "sync") {
@@ -126,6 +139,7 @@ function App() {
       window.removeEventListener("keydown", handleKeyDown);
       unlistenSearch.then((fn) => fn());
       unlistenClip.then((fn) => fn());
+      unlistenClipSaved.then((fn) => fn());
       unlistenQuickPastePage.then((fn) => fn());
       unlistenQuickPasteFile.then((fn) => fn());
     };
@@ -142,14 +156,20 @@ function App() {
         onSync={sync.triggerSync}
       />
       <main style={{ flex: 1, overflow: "hidden" }} onClick={() => setSidebarFocused(false)}>
-        {currentPage === "dashboard" && <DashboardPage onNavigate={setCurrentPage} />}
-        {currentPage === "conversations" && <ConversationsPage onFocusSidebar={focusSidebar} enterTrigger={enterContentTrigger} sidebarFocused={sidebarFocused} />}
-        {currentPage === "notes" && <NotesPage focusTrigger={focusTrigger} onFocusSidebar={focusSidebar} enterTrigger={enterContentTrigger} />}
-        {currentPage === "clipboard" && <ClipboardPage onFocusSidebar={focusSidebar} enterTrigger={enterContentTrigger} />}
-        {currentPage === "plans" && <PlansPage onFocusSidebar={focusSidebar} enterTrigger={enterContentTrigger} />}
-        {currentPage === "claude-config" && <ClaudeConfigPage onFocusSidebar={focusSidebar} enterTrigger={enterContentTrigger} />}
-        {currentPage === "search" && <SearchPage focusTrigger={focusTrigger} openFilePath={openFilePath} onFileOpened={() => setOpenFilePath(null)} />}
-        {currentPage === "settings" && <SettingsPage theme={theme} onToggleTheme={toggleTheme} />}
+        {initialized === false && currentPage !== "settings" ? (
+          <NotInitialized />
+        ) : (
+          <>
+            {currentPage === "dashboard" && <DashboardPage onNavigate={setCurrentPage} />}
+            {currentPage === "conversations" && <ConversationsPage onFocusSidebar={focusSidebar} enterTrigger={enterContentTrigger} sidebarFocused={sidebarFocused} />}
+            {currentPage === "notes" && <NotesPage focusTrigger={focusTrigger} onFocusSidebar={focusSidebar} enterTrigger={enterContentTrigger} />}
+            {currentPage === "clipboard" && <ClipboardPage onFocusSidebar={focusSidebar} enterTrigger={enterContentTrigger} />}
+            {currentPage === "plans" && <PlansPage onFocusSidebar={focusSidebar} enterTrigger={enterContentTrigger} />}
+            {currentPage === "claude-config" && <ClaudeConfigPage onFocusSidebar={focusSidebar} enterTrigger={enterContentTrigger} />}
+            {currentPage === "search" && <SearchPage focusTrigger={focusTrigger} openFilePath={openFilePath} onFileOpened={() => setOpenFilePath(null)} />}
+            {currentPage === "settings" && <SettingsPage theme={theme} onToggleTheme={toggleTheme} />}
+          </>
+        )}
       </main>
       <DropZone />
     </div>

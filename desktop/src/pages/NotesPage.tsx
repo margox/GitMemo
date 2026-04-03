@@ -104,16 +104,22 @@ export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSideba
     e: ClipboardEvent<HTMLTextAreaElement>,
     setter: Dispatch<SetStateAction<string>>,
   ) => {
-    const files = Array.from(e.clipboardData.items)
+    // Try clipboardData.items first (standard), then fall back to clipboardData.files
+    // (Tauri WKWebView on macOS may only expose pasted images via .files)
+    let pastedFiles = Array.from(e.clipboardData.items)
       .filter((item) => item.kind === "file")
       .map((item) => item.getAsFile())
       .filter((file): file is File => file !== null);
 
-    if (files.length === 0) return;
+    if (pastedFiles.length === 0 && e.clipboardData.files.length > 0) {
+      pastedFiles = Array.from(e.clipboardData.files);
+    }
+
+    if (pastedFiles.length === 0) return;
 
     e.preventDefault();
     try {
-      for (const file of files) {
+      for (const file of pastedFiles) {
         const saved = await saveAttachment(file);
         appendAttachmentMarkdown(setter, saved.markdown);
         showToast(saved.message);

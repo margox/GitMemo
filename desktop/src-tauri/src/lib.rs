@@ -21,6 +21,7 @@ pub fn run() {
             Some(vec!["--hidden"]),
         ))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        .plugin(tauri_plugin_notification::init())
         .invoke_handler(tauri::generate_handler![
             // Notes
             notes::create_note,
@@ -43,6 +44,7 @@ pub fn run() {
             // Stats
             stats::get_stats,
             stats::get_status,
+            stats::get_recent_activity,
             // Clipboard
             clipboard::get_clipboard_status,
             clipboard::start_clipboard_watch,
@@ -165,7 +167,10 @@ pub fn run() {
             // --- Global Shortcut: Cmd+Shift+G → show + search ---
             let shortcut = Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::KeyG);
             let app_handle = app.handle().clone();
-            app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, _event| {
+            app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, event| {
+                if event.state != tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                    return;
+                }
                 if let Some(w) = app_handle.get_webview_window("main") {
                     let _ = w.show();
                     let _ = w.set_focus();
@@ -176,7 +181,10 @@ pub fn run() {
             // --- Global Shortcut: Cmd+Shift+Space → toggle Quick Paste ---
             let qp_shortcut = Shortcut::new(Some(Modifiers::SUPER | Modifiers::SHIFT), Code::Space);
             let qp_handle = app.handle().clone();
-            app.global_shortcut().on_shortcut(qp_shortcut, move |_app, _shortcut, _event| {
+            app.global_shortcut().on_shortcut(qp_shortcut, move |_app, _shortcut, event| {
+                if event.state != tauri_plugin_global_shortcut::ShortcutState::Pressed {
+                    return;
+                }
                 if let Some(w) = qp_handle.get_webview_window("quick-paste") {
                     if w.is_visible().unwrap_or(false) {
                         let _ = w.hide();

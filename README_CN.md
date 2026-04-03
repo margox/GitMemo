@@ -122,10 +122,14 @@ gitmemo init --path /path/to/your/repo
 
 执行 `gitmemo init` 后，打开 GitMemo Desktop，它会读取与 CLI 相同的同步目录（通常是 `~/.gitmemo`）。
 
-- 仪表盘会展示与远端的同步方向，而不再只显示“已同步”
-- 搜索、笔记、计划、剪贴板、Claude 配置都共享同一份 GitMemo 数据目录
+- **仪表盘**：统计卡片、同步状态、最近动态 Feed、剪贴板监控指示器
+- **全文搜索**：跨对话、笔记、剪贴板、计划和配置搜索
+- **剪贴板监控**：支持文本和图片捕获，缩略图预览
+- **系统通知**：通过 macOS 通知中心推送同步错误和剪贴板捕获（仅后台）
+- **Quick Paste**：浮窗命令面板（Cmd+Shift+Space）
+- **系统托盘**：快捷操���（打开/同步/剪贴板/退出）
 - Claude Code 和 Cursor 生成的 plans 都会导入到 `plans/`
-- 当前桌面端安装包仅支持 macOS
+- 当前桌面端安装包仅支持 **macOS**（Apple Silicon + Intel）
 - Desktop 运行时不依赖额外安装的 CLI 二进制；CLI 主要用于 `gitmemo init` 这类命令
 
 ### 对话如何保存

@@ -2,6 +2,7 @@ import { createContext, useContext, useCallback, useEffect, useRef, type ReactNo
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
 import { useSyncState, type UseSyncStateReturn } from "./useSyncState";
+import { notify } from "../utils/notify";
 
 interface GitSyncEvent {
   ok: boolean;
@@ -27,6 +28,7 @@ export function SyncProvider({ children }: { children: ReactNode }) {
     const unEnd = listen<GitSyncEvent>("git-sync-end", ({ payload }) => {
       if (payload?.ok === false) {
         sync.setFailed(payload.message || "Sync failed");
+        void notify("GitMemo Sync Failed", payload.message);
       } else {
         sync.setSuccess(payload?.message || "Synced");
       }

@@ -33,7 +33,12 @@
     "totalFiles": "共 {0} 个文件",
     "loading": "加载中...",
     "noRemote": "无远程仓库",
-    "initHint": "运行 `gitmemo init` 开始使用"
+    "initHint": "运行 `gitmemo init` 开始使用",
+    "recentActivity": "最近动态",
+    "clipboardActive": "剪贴板监控中",
+    "clipboardInactive": "剪贴板未启动",
+    "noActivity": "暂无动态",
+    "viewAll": "查看全部"
   },
   "conversations": {
     "title": "对话",

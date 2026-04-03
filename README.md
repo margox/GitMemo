@@ -122,10 +122,14 @@ Your AI conversations will now auto-save to the Git repo. Try typing `/save` in 
 
 After `gitmemo init`, open GitMemo Desktop and it will read the same sync directory as the CLI (usually `~/.gitmemo`).
 
-- Dashboard shows sync direction (`ahead` / `behind`) instead of only "synced"
-- Search, notes, plans, clipboard, and Claude config all read from the same GitMemo data root
+- **Dashboard** with stats, sync status, recent activity feed, and clipboard monitoring indicator
+- **Full-text search** across conversations, notes, clips, plans, and config
+- **Clipboard monitor** with text and image capture, thumbnail previews
+- **System notifications** via macOS Notification Center (sync errors, clipboard captures)
+- **Quick Paste** floating window (Cmd+Shift+Space) for command palette access
+- **System tray** with quick actions (Open/Sync/Clipboard/Quit)
 - Plans created by Claude Code and Cursor are both imported into `plans/`
-- Current desktop packages target macOS only
+- Current desktop packages target **macOS only** (Apple Silicon + Intel)
 - Desktop does not require a separately installed CLI binary at runtime; the CLI is only needed for commands like `gitmemo init`
 
 ### How Conversations Are Saved

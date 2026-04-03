@@ -64,6 +64,10 @@ pub fn get_clipboard_status() -> Result<ClipboardStatus, String> {
 
 #[tauri::command]
 pub fn start_clipboard_watch(app: AppHandle) -> Result<String, String> {
+    let sync_dir = files::sync_dir();
+    if !sync_dir.exists() {
+        return Err("GitMemo not initialized. Run `gitmemo init` first.".into());
+    }
     if WATCHING.load(Ordering::SeqCst) {
         return Ok("Clipboard watch already running".into());
     }

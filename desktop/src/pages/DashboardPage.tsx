@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useI18n } from "../hooks/useI18n";
-import { formatAbsoluteTime } from "../utils/time";
+import { relativeTime, formatAbsoluteTime } from "../utils/time";
+import { useRelativeTimeTick } from "../hooks/useRelativeTimeTick";
 import {
   MessageSquare, StickyNote, BookOpen, FileText, Clipboard,
   HardDrive, GitBranch, GitCommit, RefreshCw, Zap, FolderOpen, Terminal, Lightbulb,
+  Activity, Circle,
 } from "lucide-react";
 
 interface AppStats {
@@ -31,29 +33,58 @@ interface AppStatus {
   checked_at: string;
 }
 
+interface ClipboardStatus {
+  watching: boolean;
+  clips_count: number;
+  clips_dir: string;
+}
+
+interface RecentItem {
+  name: string;
+  path: string;
+  category: string;
+  modified: string;
+  modified_ts: number;
+}
 
 import type { Page } from "../App";
 
+const categoryConfig: Record<string, { icon: typeof MessageSquare; color: string; page: Page }> = {
+  conversation: { icon: MessageSquare, color: "var(--accent)", page: "conversations" },
+  daily: { icon: StickyNote, color: "var(--green)", page: "notes" },
+  manual: { icon: BookOpen, color: "var(--yellow)", page: "notes" },
+  scratch: { icon: FileText, color: "#c084fc", page: "notes" },
+  clip: { icon: Clipboard, color: "#f472b6", page: "clipboard" },
+  plan: { icon: Lightbulb, color: "#fbbf24", page: "plans" },
+};
+
 export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page) => void }) {
   const { t } = useI18n();
+  useRelativeTimeTick();
   const [stats, setStats] = useState<AppStats | null>(null);
   const [status, setStatus] = useState<AppStatus | null>(null);
+  const [clipStatus, setClipStatus] = useState<ClipboardStatus | null>(null);
+  const [recent, setRecent] = useState<RecentItem[]>([]);
   const [error, setError] = useState("");
 
   useEffect(() => {
     loadData();
-    const timer = setInterval(loadData, 5000);
+    const timer = setInterval(loadData, 30000);
     return () => clearInterval(timer);
   }, []);
 
   const loadData = async () => {
     try {
-      const [s, st] = await Promise.all([
+      const [s, st, cs, r] = await Promise.all([
         invoke<AppStats>("get_stats"),
         invoke<AppStatus>("get_status"),
+        invoke<ClipboardStatus>("get_clipboard_status").catch(() => null),
+        invoke<RecentItem[]>("get_recent_activity").catch(() => []),
       ]);
       setStats(s);
       setStatus(st);
+      setClipStatus(cs);
+      setRecent(r);
     } catch (e) {
       setError(`${e}`);
     }
@@ -124,7 +155,29 @@ export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page
 
   return (
     <div style={{ padding: "20px 28px 28px", overflowY: "auto", height: "100%" }}>
-      <h1 style={{ fontSize: 20, fontWeight: 700, marginBottom: 16 }}>{t("dashboard.title")}</h1>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
+        <h1 style={{ fontSize: 20, fontWeight: 700 }}>{t("dashboard.title")}</h1>
+        {clipStatus && (
+          <div style={{
+            display: "flex", alignItems: "center", gap: 6,
+            padding: "4px 12px", borderRadius: 20,
+            background: clipStatus.watching ? "#0f2d0f" : "var(--bg-hover)",
+            cursor: "pointer",
+          }} onClick={() => onNavigate?.("clipboard")}>
+            <Circle
+              size={7}
+              fill={clipStatus.watching ? "var(--green)" : "var(--text-secondary)"}
+              style={{ color: clipStatus.watching ? "var(--green)" : "var(--text-secondary)" }}
+            />
+            <span style={{
+              fontSize: 11, fontWeight: 500,
+              color: clipStatus.watching ? "var(--green)" : "var(--text-secondary)",
+            }}>
+              {clipStatus.watching ? t("dashboard.clipboardActive") : t("dashboard.clipboardInactive")}
+            </span>
+          </div>
+        )}
+      </div>
 
       {/* Stat Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
@@ -156,42 +209,93 @@ export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page
         })}
       </div>
 
-      {/* Git Info — 2 cards */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        {/* Sync Status */}
-        <div style={cardStyle}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <RefreshCw size={13} style={{ color: "var(--text-secondary)" }} />
-            <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>{t("dashboard.syncStatus")}</span>
+      {/* Git Info + Recent Activity — 2 columns */}
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
+        {/* Left: Git Status */}
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          {/* Sync Status */}
+          <div style={cardStyle}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <RefreshCw size={13} style={{ color: "var(--text-secondary)" }} />
+              <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>{t("dashboard.syncStatus")}</span>
+            </div>
+            <p style={{ fontSize: 18, fontWeight: 700 }}>
+              <span style={{ color: syncStatus.color }}>{syncStatus.text}</span>
+            </p>
+            <p style={{ fontSize: 10, color: "var(--text-secondary)", marginTop: 6 }}>
+              {formatAbsoluteTime(status.checked_at || status.last_commit_time)}
+            </p>
           </div>
-          <p style={{ fontSize: 18, fontWeight: 700 }}>
-            <span style={{ color: syncStatus.color }}>{syncStatus.text}</span>
-          </p>
-          <p style={{ fontSize: 10, color: "var(--text-secondary)", marginTop: 6 }}>
-            {formatAbsoluteTime(status.checked_at || status.last_commit_time)}
-          </p>
+
+          {/* Last Commit */}
+          <div style={cardStyle}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+              <GitCommit size={13} style={{ color: "var(--text-secondary)" }} />
+              <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>{t("dashboard.lastCommit")}</span>
+            </div>
+            <p style={{ fontSize: 18, fontWeight: 700, fontFamily: "ui-monospace, monospace", color: "var(--accent)" }}>
+              {status.last_commit_id || "—"}
+            </p>
+            {status.last_commit_time && (
+              <p style={{ fontSize: 10, color: "var(--text-secondary)", marginTop: 6 }}>
+                {formatAbsoluteTime(status.last_commit_time)}
+              </p>
+            )}
+          </div>
         </div>
 
-        {/* Last Commit */}
+        {/* Right: Recent Activity */}
         <div style={cardStyle}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
-            <GitCommit size={13} style={{ color: "var(--text-secondary)" }} />
-            <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>{t("dashboard.lastCommit")}</span>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+            <Activity size={13} style={{ color: "var(--text-secondary)" }} />
+            <span style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 500 }}>{t("dashboard.recentActivity")}</span>
           </div>
-          <p style={{ fontSize: 18, fontWeight: 700, fontFamily: "ui-monospace, monospace", color: "var(--accent)" }}>
-            {status.last_commit_id || "—"}
-          </p>
-          {status.last_commit_time && (
-            <p style={{ fontSize: 10, color: "var(--text-secondary)", marginTop: 6 }}>
-              {formatAbsoluteTime(status.last_commit_time)}
+          {recent.length === 0 ? (
+            <p style={{ fontSize: 12, color: "var(--text-secondary)", padding: "12px 0" }}>
+              {t("dashboard.noActivity")}
             </p>
+          ) : (
+            <div style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+              {recent.map((item) => {
+                const cfg = categoryConfig[item.category] || categoryConfig.scratch;
+                const Icon = cfg.icon;
+                return (
+                  <button
+                    key={item.path}
+                    type="button"
+                    onClick={() => onNavigate?.(cfg.page)}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 8,
+                      padding: "6px 8px", borderRadius: 6,
+                      background: "transparent", border: "none",
+                      cursor: "pointer", textAlign: "left",
+                      color: "var(--text)", width: "100%",
+                      transition: "background 0.15s",
+                    }}
+                    onMouseEnter={(e) => { e.currentTarget.style.background = "var(--bg-hover)"; }}
+                    onMouseLeave={(e) => { e.currentTarget.style.background = "transparent"; }}
+                  >
+                    <Icon size={12} style={{ color: cfg.color, flexShrink: 0 }} />
+                    <span style={{
+                      flex: 1, fontSize: 12, overflow: "hidden",
+                      textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }}>
+                      {item.name}
+                    </span>
+                    <span style={{ fontSize: 10, color: "var(--text-secondary)", flexShrink: 0 }}>
+                      {relativeTime(item.modified, t)}
+                    </span>
+                  </button>
+                );
+              })}
+            </div>
           )}
         </div>
       </div>
 
       {/* Quick Info */}
       <div style={{
-        marginTop: 20, padding: "16px 20px", borderRadius: 10,
+        padding: "16px 20px", borderRadius: 10,
         border: "1px dashed var(--border)", background: "transparent",
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>

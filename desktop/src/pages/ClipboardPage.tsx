@@ -41,7 +41,7 @@ interface NoteResult {
   message: string;
 }
 
-function ClipImageThumb({ relPath, selected }: { relPath: string; selected: boolean }) {
+function ClipImageThumb({ relPath, selected, wide }: { relPath: string; selected: boolean; wide?: boolean }) {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -55,9 +55,11 @@ function ClipImageThumb({ relPath, selected }: { relPath: string; selected: bool
       .catch(() => {});
     return () => { cancelled = true; };
   }, [relPath]);
+  const w = wide ? "100%" : 56;
+  const h = wide ? 80 : 40;
   if (!src) {
     return (
-      <div style={{ width: 56, height: 40, flexShrink: 0, borderRadius: 4, background: "var(--bg-hover)" }} />
+      <div style={{ width: w, height: h, flexShrink: 0, borderRadius: 4, background: "var(--bg-hover)" }} />
     );
   }
   return (
@@ -65,8 +67,8 @@ function ClipImageThumb({ relPath, selected }: { relPath: string; selected: bool
       src={src}
       alt=""
       style={{
-        width: 56,
-        height: 40,
+        width: w,
+        height: h,
         objectFit: "cover",
         borderRadius: 4,
         flexShrink: 0,
@@ -278,10 +280,19 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
                       color: selected ? "#fff" : "var(--text)",
                     }}
                   >
-                    <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
-                      {file.preview_image ? (
-                        <ClipImageThumb relPath={file.preview_image} selected={selected} />
-                      ) : null}
+                    {file.preview_image ? (
+                      <div style={{ minWidth: 0 }}>
+                        <ClipImageThumb relPath={file.preview_image} selected={selected} wide />
+                        <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 6 }}>
+                          <span style={{ fontSize: 11, color: selected ? "rgba(255,255,255,0.7)" : "var(--text-secondary)" }}>
+                            {relativeTime(file.modified, t)}
+                          </span>
+                          <span style={{ fontSize: 10, color: selected ? "rgba(255,255,255,0.5)" : "var(--text-secondary)", opacity: 0.7 }}>
+                            {file.name}
+                          </span>
+                        </div>
+                      </div>
+                    ) : (
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <p style={{
                           fontSize: 13, marginBottom: 6, whiteSpace: "pre-wrap",
@@ -294,7 +305,7 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
                           {relativeTime(file.modified, t)}
                         </span>
                       </div>
-                    </div>
+                    )}
                   </button>
                   <button
                     type="button"

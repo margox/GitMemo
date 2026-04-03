@@ -2,8 +2,6 @@ use gitmemo_core::storage::{database, files, git};
 use serde::Serialize;
 use std::sync::atomic::{AtomicU64, Ordering};
 
-use super::notes;
-
 static LAST_REMOTE_REFRESH_AT: AtomicU64 = AtomicU64::new(0);
 const REMOTE_REFRESH_INTERVAL_SECS: u64 = 30;
 
@@ -43,11 +41,10 @@ pub fn get_stats() -> Result<AppStats, String> {
     if !sync_dir.exists() {
         return Err("GitMemo 未初始化".into());
     }
-    notes::sync_external_plans_to_gitmemo(&sync_dir);
 
     let db_path = sync_dir.join(".metadata").join("index.db");
     let conn = database::open_or_create(&db_path).map_err(|e| e.to_string())?;
-    database::build_index(&conn, &sync_dir).map_err(|e| e.to_string())?;
+    // Use existing index; full rebuild happens on search or manual sync
     let stats = database::get_stats(&conn).map_err(|e| e.to_string())?;
 
     let total_size: u64 = walkdir::WalkDir::new(&sync_dir)
@@ -169,6 +166,92 @@ fn maybe_refresh_remote(sync_dir: &std::path::Path) {
     {
         let _ = git::fetch(sync_dir);
     }
+}
+
+#[derive(Debug, Serialize)]
+pub struct RecentItem {
+    pub name: String,
+    pub path: String,
+    pub category: String,
+    pub modified: String,
+    pub modified_ts: i64,
+}
+
+#[tauri::command]
+pub fn get_recent_activity() -> Result<Vec<RecentItem>, String> {
+    let sync_dir = files::sync_dir();
+    if !sync_dir.exists() {
+        return Ok(vec![]);
+    }
+
+    let folders = ["conversations", "notes/scratch", "notes/daily", "notes/manual", "clips", "plans"];
+    let mut items: Vec<RecentItem> = Vec::new();
+
+    for folder in &folders {
+        let target = sync_dir.join(folder);
+        if !target.exists() {
+            continue;
+        }
+        for entry in walkdir::WalkDir::new(&target)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
+        {
+            let path = entry.path();
+            let rel_path = path
+                .strip_prefix(&sync_dir)
+                .unwrap_or(path)
+                .to_string_lossy()
+                .to_string();
+            let meta = path.metadata().ok();
+            let modified_time = meta.as_ref().and_then(|m| m.modified().ok());
+            let modified_ts = modified_time
+                .map(|t| {
+                    t.duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_millis() as i64
+                })
+                .unwrap_or(0);
+            let modified = modified_time
+                .map(|t| {
+                    let dt: chrono::DateTime<chrono::Local> = t.into();
+                    local_timestamp(&dt)
+                })
+                .unwrap_or_default();
+
+            let name = path
+                .file_stem()
+                .unwrap_or_default()
+                .to_string_lossy()
+                .to_string();
+
+            let category = if rel_path.starts_with("conversations") {
+                "conversation"
+            } else if rel_path.starts_with("clips") {
+                "clip"
+            } else if rel_path.starts_with("plans") {
+                "plan"
+            } else if rel_path.starts_with("notes/daily") {
+                "daily"
+            } else if rel_path.starts_with("notes/manual") {
+                "manual"
+            } else {
+                "scratch"
+            };
+
+            items.push(RecentItem {
+                name,
+                path: rel_path,
+                category: category.to_string(),
+                modified,
+                modified_ts,
+            });
+        }
+    }
+
+    items.sort_by(|a, b| b.modified_ts.cmp(&a.modified_ts));
+    items.truncate(8);
+    Ok(items)
 }
 
 fn get_last_commit(repo_path: &std::path::Path) -> (String, String, String) {

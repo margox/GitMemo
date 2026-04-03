@@ -33,7 +33,12 @@
     "totalFiles": "Total: {0} files",
     "loading": "Loading...",
     "noRemote": "No remote",
-    "initHint": "Run `gitmemo init` to get started"
+    "initHint": "Run `gitmemo init` to get started",
+    "recentActivity": "Recent Activity",
+    "clipboardActive": "Clipboard Active",
+    "clipboardInactive": "Clipboard Paused",
+    "noActivity": "No activity yet",
+    "viewAll": "View all"
   },
   "conversations": {
     "title": "Conversations",

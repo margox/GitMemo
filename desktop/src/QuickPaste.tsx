@@ -263,7 +263,7 @@ export default function QuickPaste() {
         return;
       }
 
-      if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+      if (e.key === "Enter" && !e.isComposing) {
         e.preventDefault();
         executeSelected();
       }
