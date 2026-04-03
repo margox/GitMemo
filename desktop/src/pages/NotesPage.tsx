@@ -6,6 +6,7 @@ import MarkdownView from "../components/MarkdownView";
 import { CopyPathButton } from "../components/CopyPathButton";
 import { useResizablePanel } from "../hooks/useResizablePanel";
 import { useRelativeTimeTick } from "../hooks/useRelativeTimeTick";
+import { usePlatform } from "../hooks/usePlatform";
 import { relativeTime } from "../utils/time";
 import { useI18n } from "../hooks/useI18n";
 import { useToast } from "../hooks/useToast";
@@ -43,6 +44,7 @@ export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSideba
   const { t } = useI18n();
   const { showToast } = useToast();
   useRelativeTimeTick();
+  const isMobile = usePlatform() === "mobile";
   const panel = useResizablePanel("notes", 300);
   const [activeTab, setActiveTab] = useState<NoteTab>("scratch");
   const [files, setFiles] = useState<FileEntry[]>([]);
@@ -232,11 +234,15 @@ export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSideba
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [navPrev, navNext, editing, selectedFile, handleDelete, fileContent]);
 
+  const showList = !isMobile || !selectedFile;
+  const showDetail = !isMobile || !!selectedFile;
+
   return (
     <div style={{ display: "flex", height: "100%" }}>
       {/* Left Panel - File List */}
+      {showList && (
       <div style={{
-        width: panel.width, borderRight: "1px solid var(--border)",
+        width: isMobile ? "100%" : panel.width, borderRight: isMobile ? "none" : "1px solid var(--border)",
         display: "flex", flexDirection: "column", height: "100%",
       }}>
         {/* Tabs */}
@@ -375,13 +381,17 @@ export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSideba
           )}
         </div>
       </div>
+      )}
 
       {/* Drag handle */}
+      {!isMobile && (
       <div onMouseDown={panel.onMouseDown} style={panel.handleStyle}>
         <div style={panel.handleHoverStyle} />
       </div>
+      )}
 
       {/* Right Panel - Content */}
+      {showDetail && (
       <div style={{ flex: 1, display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
         {selectedFile ? (
           <>
@@ -456,6 +466,7 @@ export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSideba
           </div>
         )}
       </div>
+      )}
     </div>
   );
 }

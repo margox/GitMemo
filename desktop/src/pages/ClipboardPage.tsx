@@ -11,6 +11,7 @@ import { useRelativeTimeTick } from "../hooks/useRelativeTimeTick";
 import { relativeTime } from "../utils/time";
 import { useI18n } from "../hooks/useI18n";
 import { useToast } from "../hooks/useToast";
+import { usePlatform } from "../hooks/usePlatform";
 
 interface ClipboardStatus {
   watching: boolean;
@@ -81,6 +82,7 @@ function ClipImageThumb({ relPath, selected, wide }: { relPath: string; selected
 export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTrigger: _enterTrigger }: { onFocusSidebar?: () => void; enterTrigger?: number } = {}) {
   const { t } = useI18n();
   const { showToast } = useToast();
+  const isMobile = usePlatform() === "mobile";
   useRelativeTimeTick();
   const panel = useResizablePanel("clipboard", 340);
   const [status, setStatus] = useState<ClipboardStatus | null>(null);
@@ -203,11 +205,15 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
     }
   };
 
+  const showList = !isMobile || !selectedFile;
+  const showDetail = !isMobile || !!selectedFile;
+
   return (
     <div style={{ display: "flex", height: "100%" }}>
       {/* Left Panel — clip list */}
+      {showList && (
       <div style={{
-        width: panel.width, borderRight: "1px solid var(--border)",
+        width: isMobile ? "100%" : panel.width, borderRight: isMobile ? "none" : "1px solid var(--border)",
         display: "flex", flexDirection: "column", flexShrink: 0,
       }}>
         {/* Header */}
@@ -339,13 +345,17 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
           {t("clipboard.clipsTotal", String(status?.clips_count ?? 0))}
         </div>
       </div>
+      )}
 
       {/* Drag handle */}
+      {!isMobile && (
       <div onMouseDown={panel.onMouseDown} style={panel.handleStyle}>
         <div style={panel.handleHoverStyle} />
       </div>
+      )}
 
       {/* Right Panel — full content */}
+      {showDetail && (
       <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
         {!selectedFile ? (
           <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -409,6 +419,7 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
           </>
         )}
       </div>
+      )}
     </div>
   );
 }
