@@ -1,6 +1,6 @@
 mod commands;
 
-use commands::{clipboard, import, notes, search, settings, stats};
+use commands::{clipboard, crash_log, import, notes, search, settings, stats};
 use tauri::Emitter;
 
 #[cfg(desktop)]
@@ -16,7 +16,18 @@ use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Install panic hook FIRST — catches any panic from here on
+    crash_log::install_panic_hook();
+
     let mut builder = tauri::Builder::default()
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .target(tauri_plugin_log::Target::new(
+                    tauri_plugin_log::TargetKind::LogDir { file_name: Some("gitmemo".into()) },
+                ))
+                .level(log::LevelFilter::Info)
+                .build(),
+        )
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_process::init())
@@ -79,6 +90,9 @@ pub fn run() {
             settings::get_cursor_integration_status,
             settings::setup_cursor_integration,
             settings::remove_cursor_integration,
+            // Crash logs
+            crash_log::get_crash_logs,
+            crash_log::clear_crash_logs,
         ])
         .setup(|app| {
             // Store app handle for background git sync events
@@ -101,7 +115,11 @@ pub fn run() {
             Ok(())
         })
         .run(tauri::generate_context!())
-        .expect("error while running tauri application");
+        .unwrap_or_else(|e| {
+            let msg = format!("Tauri application failed to start: {e}");
+            log::error!("{}", msg);
+            crash_log::write_crash_log("startup_error", &msg);
+        });
 }
 
 #[cfg(desktop)]
