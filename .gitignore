@@ -1,3 +1,9 @@
 /target
 PRODUCTHUNT.md
 ARTICLE_CN.md
+
+# macOS
+.DS_Store
+
+# Tauri generated schemas
+desktop/src-tauri/gen/schemas/
