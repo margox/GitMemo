@@ -7,3 +7,6 @@ ARTICLE_CN.md
 
 # Tauri generated schemas
 desktop/src-tauri/gen/schemas/
+
+# Build-time generated
+desktop/public/changelog.json

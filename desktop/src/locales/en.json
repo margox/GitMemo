@@ -95,7 +95,8 @@
     "clipsTotal": "{0} clips total",
     "deleteConfirm": "Delete this clip from saved history?",
     "deleteClip": "Delete",
-    "clipDeleted": "Clip deleted"
+    "clipDeleted": "Clip deleted",
+    "loading": "Loading..."
   },
   "search": {
     "placeholder": "Search conversations, notes, clips... (Cmd+K)",
@@ -149,7 +150,9 @@
     "claudeEnable": "Enable",
     "dark": "dark",
     "light": "light",
-    "sendFeedback": "Send Feedback"
+    "sendFeedback": "Send Feedback",
+    "changelog": "Changelog",
+    "noChangelog": "No changelog available"
   },
   "time": {
     "justNow": "Just now",

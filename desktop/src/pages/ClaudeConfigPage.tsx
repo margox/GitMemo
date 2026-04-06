@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { Brain, Wrench, FileText, ChevronLeft, ScrollText } from "lucide-react";
+import { Loading } from "../components/Loading";
 import MarkdownView from "../components/MarkdownView";
 import { CopyPathButton } from "../components/CopyPathButton";
 import { useResizablePanel } from "../hooks/useResizablePanel";
@@ -192,7 +193,7 @@ export default function ClaudeConfigPage({ onFocusSidebar: _onFocusSidebar, ente
         {/* File list */}
         <div style={{ flex: 1, overflowY: "auto" }}>
           {loading ? (
-            <p style={{ padding: 20, fontSize: 13, color: "var(--text-secondary)" }}>Loading...</p>
+            <Loading compact text="Loading..." />
           ) : files.length === 0 ? (
             <div style={{ padding: 32, textAlign: "center" }}>
               <TabIcon size={36} style={{ color: "var(--border)", margin: "0 auto 12px" }} />

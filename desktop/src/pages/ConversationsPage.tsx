@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ask } from "@tauri-apps/plugin-dialog";
+import { Loading } from "../components/Loading";
 import { MessageSquare, Trash2, ChevronLeft, Pencil, Save, X } from "lucide-react";
 import MarkdownView from "../components/MarkdownView";
 import { CopyPathButton } from "../components/CopyPathButton";
@@ -292,7 +293,7 @@ export default function ConversationsPage({ onFocusSidebar, enterTrigger, sideba
         {/* List */}
         <div style={{ flex: 1, overflowY: "auto" }}>
           {loading ? (
-            <p style={{ padding: 20, fontSize: 13, color: "var(--text-secondary)" }}>{t("conversations.loading")}</p>
+            <Loading compact text={t("conversations.loading")} />
           ) : files.length === 0 ? (
             <div style={{ padding: 32, textAlign: "center" }}>
               <MessageSquare size={36} style={{ color: "var(--border)", margin: "0 auto 12px" }} />

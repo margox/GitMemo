@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ask } from "@tauri-apps/plugin-dialog";
+import { Loading } from "../components/Loading";
 import { Lightbulb, ChevronLeft, Trash2 } from "lucide-react";
 import MarkdownView from "../components/MarkdownView";
 import { CopyPathButton } from "../components/CopyPathButton";
@@ -129,7 +130,7 @@ export default function PlansPage({ onFocusSidebar: _onFocusSidebar, enterTrigge
 
         <div style={{ flex: 1, overflowY: "auto" }}>
           {loading ? (
-            <p style={{ padding: 20, fontSize: 13, color: "var(--text-secondary)" }}>Loading...</p>
+            <Loading compact text="Loading..." />
           ) : files.length === 0 ? (
             <div style={{ padding: 32, textAlign: "center" }}>
               <Lightbulb size={36} style={{ color: "var(--border)", margin: "0 auto 12px" }} />

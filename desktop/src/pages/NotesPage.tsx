@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback, type ClipboardEvent, type Dispatch, type SetStateAction } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ask } from "@tauri-apps/plugin-dialog";
+import { Loading } from "../components/Loading";
 import { Plus, FileText, Calendar, BookOpen, Send, ChevronLeft, Pencil, Save, Trash2, X } from "lucide-react";
 import MarkdownView from "../components/MarkdownView";
 import { CopyPathButton } from "../components/CopyPathButton";
@@ -335,7 +336,7 @@ export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSideba
         {/* File list */}
         <div style={{ flex: 1, overflowY: "auto" }}>
           {loading ? (
-            <p style={{ padding: 20, fontSize: 12, color: "var(--text-secondary)" }}>{t("notes.loading")}</p>
+            <Loading compact text={t("notes.loading")} />
           ) : files.length === 0 ? (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 20px", textAlign: "center" }}>
               <FileText size={36} style={{ color: "var(--border)", marginBottom: 12 }} />

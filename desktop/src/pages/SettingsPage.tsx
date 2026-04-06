@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { Settings, Power, Clipboard, Sun, Moon, GitBranch, ExternalLink, Globe, FolderOpen, Globe2, Terminal, Code, Copy, Check, MessageCircle } from "lucide-react";
+import { Settings, Power, Clipboard, Sun, Moon, GitBranch, ExternalLink, Globe, FolderOpen, Globe2, Terminal, Code, Copy, Check, MessageCircle, ScrollText, X } from "lucide-react";
 import { useSync } from "../hooks/useSync";
 import type { Theme } from "../App";
 import { useI18n, type Locale } from "../hooks/useI18n";
@@ -71,6 +71,8 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
   const syncDir = gitStatus?.sync_dir ?? "";
   const gitRemote = gitStatus?.git_remote ?? "";
   const [copiedField, setCopiedField] = useState<"syncDir" | "gitRemote" | null>(null);
+  const [showChangelog, setShowChangelog] = useState(false);
+  const [changelog, setChangelog] = useState<{ version: string; date: string; changes: string[] }[]>([]);
 
   useEffect(() => {
     invoke<DesktopSettings>("get_settings").then(setSettings).catch(console.error);
@@ -79,6 +81,14 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
     invoke<boolean>("get_cursor_integration_status").then(setCursorEnabled).catch(console.error);
     invoke<AppMeta>("get_app_meta").then(setAppMeta).catch(console.error);
   }, []);
+
+  const openChangelog = async () => {
+    try {
+      const res = await fetch("/changelog.json");
+      if (res.ok) setChangelog(await res.json());
+    } catch { /* ignore */ }
+    setShowChangelog(true);
+  };
 
   const toggleAutostart = async () => {
     if (!settings) return;
@@ -442,38 +452,109 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
       {/* About */}
       <div style={{ marginTop: 20, display: "flex", flexDirection: "column", alignItems: "center", padding: "20px 0" }}>
         <img src="/logo.png" alt="GitMemo" style={{ width: 48, height: 48, borderRadius: 10, marginBottom: 10 }} />
-        <p style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>GitMemo Desktop</p>
-        <p style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 4 }}>v{appMeta?.version ?? "—"}</p>
-        <p style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 4 }}>
-          {t("settings.releaseTime")}: {appMeta?.release_time || t("settings.releaseTimeUnknown")}
+        <p style={{ fontSize: 14, fontWeight: 600 }}>GitMemo Desktop</p>
+        <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 4 }}>
+          v{appMeta?.version ?? "—"} · {appMeta?.release_time || t("settings.releaseTimeUnknown")}
         </p>
-        <p style={{ fontSize: 11, color: "var(--text-secondary)", marginBottom: 8, textAlign: "center" }}>
-          {appMeta?.requires_cli ? t("settings.cliRequired") : t("settings.cliOptional")}
-          {appMeta?.recommended_cli_version ? ` · ${t("settings.recommendedCliVersion", appMeta.recommended_cli_version)}` : ""}
-        </p>
-        <button
-          onClick={() => void openUrl("https://github.com/sahadev/gitmemo")}
-          style={{
-            display: "flex", alignItems: "center", gap: 5,
-            fontSize: 11, color: "var(--accent)", background: "none",
-            border: "none", cursor: "pointer", padding: 0,
-          }}
-        >
-          <ExternalLink size={11} />
-          github.com/sahadev/gitmemo
-        </button>
-        <button
-          onClick={() => void openUrl("https://github.com/sahadev/GitMemo/issues/new?labels=feedback&title=Feedback%3A+")}
-          style={{
-            display: "flex", alignItems: "center", gap: 5,
-            fontSize: 11, color: "var(--text-secondary)", background: "none",
-            border: "none", cursor: "pointer", padding: 0, marginTop: 8,
-          }}
-        >
-          <MessageCircle size={11} />
-          {t("settings.sendFeedback")}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
+          <button
+            onClick={() => void openUrl("https://github.com/sahadev/gitmemo")}
+            style={{
+              display: "flex", alignItems: "center", gap: 4,
+              fontSize: 11, color: "var(--accent)", background: "none",
+              border: "none", cursor: "pointer", padding: 0,
+            }}
+          >
+            <ExternalLink size={11} />
+            GitHub
+          </button>
+          <span style={{ color: "var(--border)" }}>·</span>
+          <button
+            onClick={() => void openUrl("https://github.com/sahadev/GitMemo/issues/new?labels=feedback&title=Feedback%3A+")}
+            style={{
+              display: "flex", alignItems: "center", gap: 4,
+              fontSize: 11, color: "var(--text-secondary)", background: "none",
+              border: "none", cursor: "pointer", padding: 0,
+            }}
+          >
+            <MessageCircle size={11} />
+            {t("settings.sendFeedback")}
+          </button>
+          <span style={{ color: "var(--border)" }}>·</span>
+          <button
+            onClick={openChangelog}
+            style={{
+              display: "flex", alignItems: "center", gap: 4,
+              fontSize: 11, color: "var(--text-secondary)", background: "none",
+              border: "none", cursor: "pointer", padding: 0,
+            }}
+          >
+            <ScrollText size={11} />
+            {t("settings.changelog")}
+          </button>
+        </div>
       </div>
+
+      {/* Changelog Modal */}
+      {showChangelog && (
+        <div
+          style={{
+            position: "fixed", inset: 0, zIndex: 100,
+            background: "rgba(0,0,0,0.6)", backdropFilter: "blur(4px)",
+            display: "flex", alignItems: "center", justifyContent: "center",
+          }}
+          onClick={(e) => { if (e.target === e.currentTarget) setShowChangelog(false); }}
+        >
+          <div style={{
+            width: "90%", maxWidth: 520, maxHeight: "70vh",
+            background: "var(--bg-card)", border: "1px solid var(--border)",
+            borderRadius: 12, display: "flex", flexDirection: "column",
+            boxShadow: "0 20px 60px rgba(0,0,0,0.4)",
+          }}>
+            <div style={{
+              display: "flex", alignItems: "center", justifyContent: "space-between",
+              padding: "14px 18px", borderBottom: "1px solid var(--border)",
+            }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <ScrollText size={15} style={{ color: "var(--accent)" }} />
+                <span style={{ fontSize: 14, fontWeight: 600 }}>{t("settings.changelog") || "Changelog"}</span>
+              </div>
+              <button onClick={() => setShowChangelog(false)} style={{
+                background: "none", border: "none", cursor: "pointer",
+                color: "var(--text-secondary)", padding: 4, borderRadius: 4,
+              }}>
+                <X size={16} />
+              </button>
+            </div>
+            <div style={{ flex: 1, overflowY: "auto", padding: "8px 18px 18px" }}>
+              {changelog.length === 0 ? (
+                <p style={{ padding: 20, textAlign: "center", color: "var(--text-secondary)", fontSize: 13 }}>
+                  {t("settings.noChangelog") || "No changelog available"}
+                </p>
+              ) : (
+                changelog.map((release, i) => (
+                  <div key={release.version} style={{ marginTop: i === 0 ? 8 : 20 }}>
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginBottom: 8 }}>
+                      <span style={{
+                        fontSize: 13, fontWeight: 600,
+                        color: i === 0 ? "var(--accent)" : "var(--text)",
+                      }}>
+                        v{release.version}
+                      </span>
+                      <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>{release.date}</span>
+                    </div>
+                    <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, lineHeight: 1.7, color: "var(--text-secondary)" }}>
+                      {release.changes.map((change, j) => (
+                        <li key={j}>{change}</li>
+                      ))}
+                    </ul>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

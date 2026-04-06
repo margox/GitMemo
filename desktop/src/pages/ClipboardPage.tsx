@@ -5,6 +5,7 @@ import { ask } from "@tauri-apps/plugin-dialog";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { Clipboard, Play, Square, Save, Copy, Check, ChevronLeft, Trash2 } from "lucide-react";
 import MarkdownView from "../components/MarkdownView";
+import { Loading } from "../components/Loading";
 import { CopyPathButton } from "../components/CopyPathButton";
 import { useResizablePanel } from "../hooks/useResizablePanel";
 import { useRelativeTimeTick } from "../hooks/useRelativeTimeTick";
@@ -262,7 +263,7 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
         {/* Clip list */}
         <div style={{ flex: 1, overflowY: "auto" }}>
           {clipsLoading ? (
-            <p style={{ padding: 20, fontSize: 12, color: "var(--text-secondary)" }}>{t("clipboard.loading") || "Loading..."}</p>
+            <Loading compact text={t("clipboard.loading")} />
           ) : savedClips.length === 0 ? (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 20px", textAlign: "center" }}>
               <Clipboard size={36} style={{ color: "var(--border)", marginBottom: 12 }} />

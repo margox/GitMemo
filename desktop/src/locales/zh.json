@@ -95,7 +95,8 @@
     "clipsTotal": "共 {0} 条",
     "deleteConfirm": "确定从已保存记录中删除此条？",
     "deleteClip": "删除",
-    "clipDeleted": "已删除"
+    "clipDeleted": "已删除",
+    "loading": "加载中..."
   },
   "search": {
     "placeholder": "搜索对话、笔记、剪贴板... (Cmd+K)",
@@ -149,7 +150,9 @@
     "claudeEnable": "启用",
     "dark": "深色",
     "light": "浅色",
-    "sendFeedback": "发送反馈"
+    "sendFeedback": "发送反馈",
+    "changelog": "更新日志",
+    "noChangelog": "暂无更新日志"
   },
   "time": {
     "justNow": "刚刚",

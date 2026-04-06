@@ -3,6 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { useI18n } from "../hooks/useI18n";
 import { useSync } from "../hooks/useSync";
 import { relativeTime, formatAbsoluteTime } from "../utils/time";
+import { Loading } from "../components/Loading";
 import { useRelativeTimeTick } from "../hooks/useRelativeTimeTick";
 import {
   MessageSquare, StickyNote, BookOpen, FileText, Clipboard,
@@ -119,11 +120,7 @@ export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page
   }
 
   if (!stats) {
-    return (
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "100%" }}>
-        <p style={{ color: "var(--text-secondary)" }}>{t("dashboard.loading")}</p>
-      </div>
-    );
+    return <Loading text={t("dashboard.loading")} />;
   }
 
   const statCards: { icon: typeof MessageSquare; label: string; value: number | string; color: string; page?: Page }[] = [
