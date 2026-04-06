@@ -1,6 +1,7 @@
 pub mod clipboard;
 pub mod crash_log;
 pub mod import;
+pub mod init;
 pub mod notes;
 pub mod search;
 pub mod settings;

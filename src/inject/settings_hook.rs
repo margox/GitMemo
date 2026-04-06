@@ -31,7 +31,7 @@ with open('{sync_dir}/.metadata/config.toml','rb') as f:
             "type": "command",
             "async": true,
             "command": format!(
-                r#"FILE=$(cat /dev/stdin | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_input',{{}}).get('file_path',''))" 2>/dev/null); SYNC_DIR="{sync_dir}"; if echo "$FILE" | grep -q "^$SYNC_DIR/"; then cd "$SYNC_DIR" && {config_detect}git add -A && git diff --cached --quiet || git commit -m "auto: save $(basename "$FILE")" && if [ -n "$REMOTE" ]; then git push origin "$BRANCH" 2>/dev/null; fi; fi"#,
+                r#"FILE=$(cat /dev/stdin | python3 -c "import sys,json; d=json.load(sys.stdin); print(d.get('tool_input',{{}}).get('file_path',''))" 2>/dev/null); SYNC_DIR="{sync_dir}"; if echo "$FILE" | grep -q "^$SYNC_DIR/"; then cd "$SYNC_DIR" && {config_detect}git add -A && git diff --cached --quiet || git commit -m "auto: save $(basename "$FILE")" && if [ -n "$REMOTE" ]; then git push origin "$BRANCH" 2>/dev/null; fi; fi; (gitmemo capture --quiet 2>/dev/null &)"#,
                 sync_dir = sync_dir,
                 config_detect = config_detect,
             )

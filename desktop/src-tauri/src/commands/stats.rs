@@ -223,6 +223,76 @@ pub fn get_recent_activity() -> Result<Vec<RecentItem>, String> {
     Ok(items)
 }
 
+/// Get a random historical item for "Today's Review" feature
+#[tauri::command]
+pub fn get_review_item() -> Result<Option<RecentItem>, String> {
+    let sync_dir = files::sync_dir();
+    if !sync_dir.exists() {
+        return Ok(None);
+    }
+
+    let min_age_days = 7; // Only show items at least 7 days old
+    let now = std::time::SystemTime::now();
+    let min_age = std::time::Duration::from_secs(min_age_days * 24 * 60 * 60);
+
+    let folders = ["conversations", "notes/scratch", "notes/daily", "notes/manual"];
+    let mut candidates: Vec<RecentItem> = Vec::new();
+
+    for folder in &folders {
+        let target = sync_dir.join(folder);
+        if !target.exists() { continue; }
+        for entry in walkdir::WalkDir::new(&target)
+            .into_iter()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
+        {
+            let path = entry.path();
+            let meta = path.metadata().ok();
+            let modified_time = meta.as_ref().and_then(|m| m.modified().ok());
+
+            // Only include items older than min_age
+            if let Some(mt) = modified_time {
+                if let Ok(age) = now.duration_since(mt) {
+                    if age < min_age { continue; }
+                }
+            }
+
+            let rel_path = path.strip_prefix(&sync_dir).unwrap_or(path).to_string_lossy().to_string();
+            let name = path.file_stem().unwrap_or_default().to_string_lossy().to_string();
+            let modified_ts = modified_time
+                .map(|t| t.duration_since(std::time::UNIX_EPOCH).unwrap_or_default().as_millis() as i64)
+                .unwrap_or(0);
+            let modified = modified_time
+                .map(|t| {
+                    let dt: chrono::DateTime<chrono::Local> = t.into();
+                    local_timestamp(&dt)
+                })
+                .unwrap_or_default();
+
+            let category = if rel_path.starts_with("conversations") { "conversation" }
+                else if rel_path.starts_with("notes/daily") { "daily" }
+                else if rel_path.starts_with("notes/manual") { "manual" }
+                else { "scratch" };
+
+            candidates.push(RecentItem {
+                name,
+                path: rel_path,
+                category: category.to_string(),
+                modified,
+                modified_ts,
+            });
+        }
+    }
+
+    if candidates.is_empty() {
+        return Ok(None);
+    }
+
+    // Pick a pseudo-random item based on current time
+    let idx = (chrono::Local::now().timestamp() as usize) % candidates.len();
+    Ok(Some(candidates.remove(idx)))
+}
+
 fn get_last_commit(repo_path: &std::path::Path) -> (String, String, String) {
     let output = std::process::Command::new("git")
         .args(["log", "-1", "--format=%h|%s|%cI"])

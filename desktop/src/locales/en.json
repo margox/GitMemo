@@ -38,7 +38,9 @@
     "clipboardActive": "Clipboard Active",
     "clipboardInactive": "Clipboard Paused",
     "noActivity": "No activity yet",
-    "viewAll": "View all"
+    "viewAll": "View all",
+    "todayReview": "Revisit",
+    "shuffle": "Shuffle"
   },
   "conversations": {
     "title": "Conversations",
@@ -104,7 +106,13 @@
     "emptyTitle": "Full-text search across all your data",
     "emptyHint": "Cmd+Shift+G to search from anywhere",
     "noResults": "No results for \"{0}\"",
-    "results": "{0} results"
+    "results": "{0} results",
+    "filterAll": "All",
+    "filter_conversation": "Conversations",
+    "filter_note": "Notes",
+    "filter_clip": "Clips",
+    "filter_plan": "Plans",
+    "recentSearches": "Recent searches"
   },
   "plans": {
     "delete": "Delete",
@@ -187,5 +195,60 @@
     "empty": "No files yet",
     "emptyHint": "Click 'Sync to Git' to sync config",
     "selectToView": "Select a file to view"
+  },
+  "privacy": {
+    "title": "Clipboard Privacy",
+    "subtitle": "Before enabling clipboard capture",
+    "point1": "All captured content is stored locally in your ~/.gitmemo/ Git repository",
+    "point2": "Content shorter than 20 characters is automatically ignored",
+    "point3": "Common API keys and tokens are auto-filtered (sk-*, ghp_*, etc.)",
+    "point4": "You can pause capture anytime from the tray menu or this page",
+    "cancel": "Not Now",
+    "enable": "Enable Capture"
+  },
+  "onboarding": {
+    "title": "Get Started with GitMemo",
+    "dismiss": "Skip",
+    "installDone": "Installation complete",
+    "installDoneDesc": "GitMemo is set up and ready to use",
+    "writeNote": "Write your first note",
+    "writeNoteDesc": "Try a quick scratch note or daily journal entry",
+    "writeNow": "Write now",
+    "enableClipboard": "Enable clipboard capture",
+    "enableClipboardDesc": "Auto-save copied text (20+ chars) to Git",
+    "enable": "Enable",
+    "connectRemote": "Connect a Git remote",
+    "connectRemoteDesc": "Sync your knowledge to GitHub/GitLab for backup",
+    "goToSettings": "Settings",
+    "configureEditor": "Set up editor integration",
+    "configureEditorDesc": "Auto-save AI conversations from Claude Code or Cursor"
+  },
+  "setup": {
+    "next": "Continue",
+    "back": "Back",
+    "storageTitle": "Storage Mode",
+    "storageDesc": "Choose where to store your knowledge",
+    "localMode": "Local only",
+    "localModeDesc": "Store everything on this device. You can add Git remote later.",
+    "remoteMode": "Sync to Git remote",
+    "remoteModeDesc": "Push to GitHub/GitLab for backup and multi-device access.",
+    "gitUrlHint": "SSH URL recommended. You can change this later in Settings.",
+    "editorsTitle": "Editor Integration",
+    "editorsDesc": "Select editors to auto-save AI conversations. You can change this later.",
+    "claudeDesc": "Auto-save conversations via CLAUDE.md + MCP",
+    "cursorDesc": "Auto-save conversations via Cursor rules + MCP",
+    "skipEditorsHint": "No editor selected — you can enable integrations later in Settings",
+    "startSetup": "Set Up GitMemo",
+    "settingUp": "Setting up GitMemo...",
+    "pleaseWait": "Creating directories, initializing Git, configuring integrations...",
+    "failed": "Setup Failed",
+    "retry": "Try Again",
+    "complete": "You're all set!",
+    "completeDesc": "GitMemo is ready. Start capturing your knowledge.",
+    "sshKeyTitle": "SSH Public Key",
+    "sshKeyHint": "Add this key to your Git hosting provider's Deploy Keys (with write access).",
+    "copy": "Copy",
+    "copied": "Copied!",
+    "enterApp": "Enter GitMemo"
   }
 }

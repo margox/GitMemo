@@ -37,7 +37,8 @@ fn init_schema(conn: &Connection) -> Result<()> {
             source_type TEXT NOT NULL,
             title       TEXT NOT NULL,
             created_at  TEXT NOT NULL,
-            content_hash TEXT NOT NULL
+            content_hash TEXT NOT NULL,
+            tags        TEXT NOT NULL DEFAULT ''
         );
         CREATE INDEX IF NOT EXISTS idx_docs_type ON documents(source_type);
         CREATE INDEX IF NOT EXISTS idx_docs_created ON documents(created_at);
@@ -50,6 +51,8 @@ fn init_schema(conn: &Connection) -> Result<()> {
         );
         ",
     )?;
+    // Add tags column if upgrading from older schema
+    let _ = conn.execute("ALTER TABLE documents ADD COLUMN tags TEXT NOT NULL DEFAULT ''", []);
     Ok(())
 }
 
@@ -73,10 +76,34 @@ fn frontmatter_time(content: &str) -> Option<String> {
     None
 }
 
+/// Extract tags from frontmatter (supports "tags: a, b, c" and "tags: [a, b, c]")
+fn frontmatter_tags(content: &str) -> String {
+    if !content.starts_with("---") {
+        return String::new();
+    }
+    let rest = &content[3..];
+    let end = match rest.find("---") {
+        Some(e) => e,
+        None => return String::new(),
+    };
+    let fm = &rest[..end];
+    for line in fm.lines() {
+        let line = line.trim();
+        if let Some(val) = line.strip_prefix("tags:") {
+            let val = val.trim();
+            // Strip optional brackets
+            let val = val.trim_start_matches('[').trim_end_matches(']');
+            return val.to_string();
+        }
+    }
+    String::new()
+}
+
 /// Index a single file into the database
 pub fn index_file(conn: &Connection, file_path: &str, source_type: &str, title: &str, content: &str, date: &str) -> Result<()> {
     let hash = content_hash(content);
     let id = content_hash(file_path);
+    let tags = frontmatter_tags(content);
 
     // Check if already indexed with same hash
     let existing_hash: Option<String> = conn
@@ -93,8 +120,8 @@ pub fn index_file(conn: &Connection, file_path: &str, source_type: &str, title: 
 
     // Upsert document
     conn.execute(
-        "INSERT OR REPLACE INTO documents (id, file_path, source_type, title, created_at, content_hash) VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-        params![id, file_path, source_type, title, date, hash],
+        "INSERT OR REPLACE INTO documents (id, file_path, source_type, title, created_at, content_hash, tags) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+        params![id, file_path, source_type, title, date, hash, tags],
     )?;
 
     // Update FTS index

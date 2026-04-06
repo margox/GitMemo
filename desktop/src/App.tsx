@@ -14,6 +14,7 @@ import ConversationsPage from "./pages/ConversationsPage";
 import PlansPage from "./pages/PlansPage";
 import ClaudeConfigPage from "./pages/ClaudeConfigPage";
 import { NotInitialized } from "./components/NotInitialized";
+import { SetupWizard } from "./components/SetupWizard";
 import { useSync } from "./hooks/useSync";
 import { usePlatform } from "./hooks/usePlatform";
 
@@ -35,7 +36,11 @@ function App() {
   const sync = useSync();
   const { gitStatus } = sync;
   const [theme, setTheme] = useState<Theme>(() => {
-    return (localStorage.getItem("gitmemo-theme") as Theme) || "dark";
+    const saved = localStorage.getItem("gitmemo-theme") as Theme | null;
+    if (saved) return saved;
+    // Detect system preference on first launch
+    if (window.matchMedia?.("(prefers-color-scheme: light)").matches) return "light";
+    return "dark";
   });
 
   // Lazy-mount: track visited pages so they stay mounted once opened
@@ -159,8 +164,13 @@ function App() {
     };
   }, [isMobile, navigateAndFocus, sidebarFocused, currentPage, sync]);
 
+  const handleSetupComplete = useCallback(() => {
+    setInitialized(true);
+    sync.refreshGitStatus();
+  }, [sync]);
+
   const pageContent = initialized === false && currentPage !== "settings" ? (
-    <NotInitialized />
+    <SetupWizard onComplete={handleSetupComplete} />
   ) : (
     <>
       {visitedPages.has("dashboard") && <div style={{ display: currentPage === "dashboard" ? "contents" : "none" }}><DashboardPage onNavigate={setCurrentPage} /></div>}

@@ -138,4 +138,20 @@ pub enum Commands {
         #[arg(long)]
         remove: bool,
     },
+
+    /// Capture conversations from Claude Code session logs
+    #[command(version)]
+    Capture {
+        /// Only capture sessions from a specific project path
+        #[arg(long)]
+        project: Option<String>,
+
+        /// Show what would be captured without writing
+        #[arg(long)]
+        dry_run: bool,
+
+        /// Suppress output (for use in hooks)
+        #[arg(long)]
+        quiet: bool,
+    },
 }

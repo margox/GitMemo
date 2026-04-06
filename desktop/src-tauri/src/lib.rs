@@ -1,6 +1,6 @@
 mod commands;
 
-use commands::{clipboard, crash_log, import, notes, search, settings, stats, watcher};
+use commands::{clipboard, crash_log, import, init, notes, search, settings, stats, watcher};
 use tauri::{Emitter, Listener};
 
 #[cfg(desktop)]
@@ -64,10 +64,14 @@ pub fn run() {
             search::recent_conversations,
             search::reindex,
             search::fuzzy_search_files,
+            search::get_all_tags,
+            search::update_file_tags,
+            search::toggle_star,
             // Stats
             stats::get_stats,
             stats::get_status,
             stats::get_recent_activity,
+            stats::get_review_item,
             // Clipboard
             clipboard::get_clipboard_status,
             clipboard::start_clipboard_watch,
@@ -90,6 +94,10 @@ pub fn run() {
             settings::get_cursor_integration_status,
             settings::setup_cursor_integration,
             settings::remove_cursor_integration,
+            // Init (setup wizard)
+            init::init_gitmemo,
+            // Capture
+            init::capture_conversations,
             // Crash logs
             crash_log::get_crash_logs,
             crash_log::clear_crash_logs,
@@ -101,12 +109,18 @@ pub fn run() {
             // Start file system watcher
             watcher::start_file_watcher(app.handle().clone());
 
-            // Pull latest from remote on startup (with health check)
+            // Pull latest from remote on startup (with health check), then auto-capture
             std::thread::spawn(|| {
                 let sync_dir = gitmemo_core::storage::files::sync_dir();
                 if sync_dir.exists() {
                     let _ = gitmemo_core::storage::git::ensure_repo_clean(&sync_dir);
                     let _ = gitmemo_core::storage::git::pull(&sync_dir);
+                    // Auto-capture Claude Code conversations
+                    if let Ok(result) = gitmemo_core::storage::capture::run_capture(&sync_dir, None, false) {
+                        if result.new_sessions > 0 || result.updated_sessions > 0 {
+                            let _ = gitmemo_core::storage::git::commit_and_push(&sync_dir, "auto: capture conversations");
+                        }
+                    }
                 }
             });
 
@@ -131,6 +145,7 @@ fn setup_desktop(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     // --- System Tray ---
     let open_i = MenuItem::with_id(app, "open", "Open GitMemo", true, None::<&str>)?;
     let sync_i = MenuItem::with_id(app, "sync", "Sync to Git", true, None::<&str>)?;
+    let capture_i = MenuItem::with_id(app, "capture", "Capture Conversations", true, None::<&str>)?;
     let clip_label = if settings::should_autostart_clipboard() {
         "Clipboard: ON"
     } else {
@@ -139,7 +154,7 @@ fn setup_desktop(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     let clip_i = MenuItem::with_id(app, "clipboard", clip_label, true, None::<&str>)?;
     let quit_i = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
 
-    let menu = Menu::with_items(app, &[&open_i, &sync_i, &clip_i, &quit_i])?;
+    let menu = Menu::with_items(app, &[&open_i, &sync_i, &capture_i, &clip_i, &quit_i])?;
 
     let clip_menu_item = clip_i.clone();
     let _tray = TrayIconBuilder::new()
@@ -160,6 +175,20 @@ fn setup_desktop(app: &tauri::App) -> Result<(), Box<dyn std::error::Error>> {
                     let payload = match notes::sync_to_git() {
                         Ok(message) => notes::GitSyncEvent { ok: true, message },
                         Err(message) => notes::GitSyncEvent { ok: false, message },
+                    };
+                    let _ = app_handle.emit("git-sync-end", &payload);
+                });
+            }
+            "capture" => {
+                let app_handle = app.clone();
+                std::thread::spawn(move || {
+                    let _ = app_handle.emit("git-sync-start", ());
+                    let payload = match init::capture_conversations() {
+                        Ok(r) => notes::GitSyncEvent {
+                            ok: true,
+                            message: format!("{} new, {} updated", r.new_sessions, r.updated_sessions),
+                        },
+                        Err(msg) => notes::GitSyncEvent { ok: false, message: msg },
                     };
                     let _ = app_handle.emit("git-sync-end", &payload);
                 });

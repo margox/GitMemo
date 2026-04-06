@@ -475,6 +475,11 @@ Save reference-worthy standalone docs (reports, designs, tutorials) to `{sync_di
     }
 }
 
+/// Public helper so init.rs can reuse session-log skill generation
+pub fn generate_session_log_skill_content(sync_dir: &str, lang: &str) -> String {
+    generate_session_log_skill(sync_dir, lang)
+}
+
 fn generate_session_log_skill(sync_dir: &str, lang: &str) -> String {
     if lang == "zh" {
         format!(

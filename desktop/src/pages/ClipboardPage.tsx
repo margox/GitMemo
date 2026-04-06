@@ -14,6 +14,7 @@ import { useI18n } from "../hooks/useI18n";
 import { useToast } from "../hooks/useToast";
 import { usePlatform } from "../hooks/usePlatform";
 import { useFileWatcher } from "../hooks/useFileWatcher";
+import { ClipboardPrivacyDialog, useClipboardPrivacy } from "../components/ClipboardPrivacyDialog";
 
 interface ClipboardStatus {
   watching: boolean;
@@ -95,6 +96,8 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState("");
   const itemRefs = useRef<Map<string, HTMLButtonElement>>(new Map());
+  const [showPrivacyDialog, setShowPrivacyDialog] = useState(false);
+  const privacy = useClipboardPrivacy();
 
   // State-driven data loading
   useEffect(() => {
@@ -124,14 +127,26 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
     finally { setClipsLoading(false); }
   };
 
+  const doStartWatch = async () => {
+    try {
+      await invoke<string>("start_clipboard_watch");
+      loadStatus();
+    } catch (e) { showToast(`Error: ${e}`); }
+  };
+
   const toggleWatch = async () => {
     try {
       if (status?.watching) {
         await invoke<string>("stop_clipboard_watch");
+        loadStatus();
       } else {
-        await invoke<string>("start_clipboard_watch");
+        // Show privacy dialog on first enable
+        if (!privacy.isConfirmed) {
+          setShowPrivacyDialog(true);
+          return;
+        }
+        await doStartWatch();
       }
-      loadStatus();
     } catch (e) { showToast(`Error: ${e}`); }
   };
 
@@ -219,6 +234,18 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
 
   return (
     <div style={{ display: "flex", height: "100%" }}>
+      {/* Privacy confirmation dialog */}
+      {showPrivacyDialog && (
+        <ClipboardPrivacyDialog
+          onConfirm={() => {
+            privacy.confirm();
+            setShowPrivacyDialog(false);
+            void doStartWatch();
+          }}
+          onCancel={() => setShowPrivacyDialog(false)}
+        />
+      )}
+
       {/* Left Panel — clip list */}
       {showList && (
       <div style={{

@@ -17,8 +17,8 @@ fn main() -> Result<()> {
         utils::i18n::init_from_config();
     }
 
-    // Pull latest from remote on startup (skip for init/uninstall/mcp-serve)
-    if !matches!(cli.command, Commands::Init { .. } | Commands::Uninstall { .. } | Commands::McpServe) {
+    // Pull latest from remote on startup (skip for init/uninstall/mcp-serve/capture)
+    if !matches!(cli.command, Commands::Init { .. } | Commands::Uninstall { .. } | Commands::McpServe | Commands::Capture { .. }) {
         let sync_dir = storage::files::sync_dir();
         if sync_dir.exists() {
             let _ = storage::git::pull(&sync_dir);
@@ -78,6 +78,9 @@ fn main() -> Result<()> {
         }
         Commands::Remote { url, remove } => {
             cmd_remote(url, remove)?;
+        }
+        Commands::Capture { project, dry_run, quiet } => {
+            cmd_capture(project, dry_run, quiet)?;
         }
     }
 
@@ -1122,6 +1125,40 @@ fn cmd_remote(url: Option<String>, remove: bool) -> Result<()> {
                 }
             }
         }
+    }
+
+    Ok(())
+}
+
+fn cmd_capture(project: Option<String>, dry_run: bool, quiet: bool) -> Result<()> {
+    let sync_dir = storage::files::sync_dir();
+    if !sync_dir.exists() {
+        if !quiet {
+            eprintln!("[gitmemo] Not initialized. Run `gitmemo init` first.");
+        }
+        return Ok(());
+    }
+
+    let result = storage::capture::run_capture(
+        &sync_dir,
+        project.as_deref(),
+        dry_run,
+    )?;
+
+    if !quiet {
+        if result.new_sessions > 0 || result.updated_sessions > 0 {
+            println!(
+                "Captured {} new, {} updated ({} skipped)",
+                result.new_sessions, result.updated_sessions, result.skipped
+            );
+            if !dry_run {
+                let _ = storage::git::commit_and_push(&sync_dir, "auto: capture conversations");
+            }
+        } else {
+            println!("No new conversations to capture");
+        }
+    } else if !dry_run && (result.new_sessions > 0 || result.updated_sessions > 0) {
+        let _ = storage::git::commit_and_push(&sync_dir, "auto: capture conversations");
     }
 
     Ok(())

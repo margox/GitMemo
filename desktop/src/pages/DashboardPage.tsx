@@ -11,6 +11,7 @@ import {
   HardDrive, GitBranch, GitCommit, RefreshCw, Zap, FolderOpen, Terminal, Lightbulb,
   Activity, Circle,
 } from "lucide-react";
+import { OnboardingChecklist } from "../components/OnboardingChecklist";
 
 interface AppStats {
   conversations: number;
@@ -77,6 +78,8 @@ export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page
   const [clipStatus, setClipStatus] = useState<ClipboardStatus | null>(cached?.clipStatus ?? null);
   const [recent, setRecent] = useState<RecentItem[]>(cached?.recent ?? []);
   const [error, setError] = useState("");
+  const [reviewItem, setReviewItem] = useState<RecentItem | null>(null);
+  const [reviewPreview, setReviewPreview] = useState("");
 
   // Load content stats only (no git status — that comes from global useSync)
   const loadData = useCallback(async () => {
@@ -90,6 +93,18 @@ export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page
       setClipStatus(cs);
       setRecent(r);
       saveCache({ stats: s, clipStatus: cs, recent: r });
+      // Load review item
+      invoke<RecentItem | null>("get_review_item").then(item => {
+        setReviewItem(item);
+        if (item) {
+          invoke<string>("read_file", { filePath: item.path })
+            .then(content => {
+              const body = content.replace(/^---[\s\S]*?---\s*/, "").trim();
+              setReviewPreview(body.slice(0, 200));
+            })
+            .catch(() => {});
+        }
+      }).catch(() => {});
     } catch (e) {
       setError(`${e}`);
     }
@@ -192,6 +207,14 @@ export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page
           </div>
         )}
       </div>
+
+      {/* Onboarding Checklist */}
+      <OnboardingChecklist
+        onNavigate={(page) => onNavigate?.(page)}
+        onWriteNote={() => onNavigate?.("notes")}
+        hasNotes={(stats.conversations + stats.daily_notes + stats.manuals + stats.scratch_notes) > 0}
+        clipboardActive={clipStatus?.watching ?? false}
+      />
 
       {/* Stat Cards */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
@@ -303,6 +326,57 @@ export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page
             </div>
           )}
       </div>
+
+      {/* Today's Review */}
+      {reviewItem && (
+        <div style={{ ...cardStyle, marginBottom: 16, cursor: "pointer" }}
+          onClick={() => {
+            const cfg = categoryConfig[reviewItem.category] || categoryConfig.scratch;
+            onNavigate?.(cfg.page);
+          }}
+        >
+          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
+            <RefreshCw size={13} style={{ color: "var(--yellow)" }} />
+            <span style={{ fontSize: 11, color: "var(--text-secondary)", fontWeight: 500 }}>{t("dashboard.todayReview")}</span>
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                invoke<RecentItem | null>("get_review_item").then(item => {
+                  setReviewItem(item);
+                  if (item) {
+                    invoke<string>("read_file", { filePath: item.path })
+                      .then(content => {
+                        const body = content.replace(/^---[\s\S]*?---\s*/, "").trim();
+                        setReviewPreview(body.slice(0, 200));
+                      })
+                      .catch(() => {});
+                  }
+                }).catch(() => {});
+              }}
+              style={{
+                marginLeft: "auto", padding: "2px 8px", borderRadius: 4,
+                border: "1px solid var(--border)", background: "transparent",
+                color: "var(--text-secondary)", fontSize: 10, cursor: "pointer",
+              }}
+            >
+              {t("dashboard.shuffle")}
+            </button>
+          </div>
+          <p style={{ fontSize: 13, fontWeight: 600, marginBottom: 4 }}>{reviewItem.name}</p>
+          {reviewPreview && (
+            <p style={{
+              fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.5,
+              display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical",
+              overflow: "hidden",
+            }}>
+              {reviewPreview}
+            </p>
+          )}
+          <p style={{ fontSize: 10, color: "var(--text-secondary)", marginTop: 6 }}>
+            {relativeTime(reviewItem.modified, t)}
+          </p>
+        </div>
+      )}
 
       {/* Quick Info */}
       <div style={{
