@@ -1,6 +1,6 @@
 mod commands;
 
-use commands::{clipboard, crash_log, import, notes, search, settings, stats};
+use commands::{clipboard, crash_log, import, notes, search, settings, stats, watcher};
 use tauri::{Emitter, Listener};
 
 #[cfg(desktop)]
@@ -97,6 +97,9 @@ pub fn run() {
         .setup(|app| {
             // Store app handle for background git sync events
             notes::set_app_handle(app.handle().clone());
+
+            // Start file system watcher
+            watcher::start_file_watcher(app.handle().clone());
 
             // Pull latest from remote on startup (with health check)
             std::thread::spawn(|| {

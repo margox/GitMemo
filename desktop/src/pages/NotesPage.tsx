@@ -11,6 +11,7 @@ import { usePlatform } from "../hooks/usePlatform";
 import { relativeTime } from "../utils/time";
 import { useI18n } from "../hooks/useI18n";
 import { useToast } from "../hooks/useToast";
+import { useFileWatcher } from "../hooks/useFileWatcher";
 
 interface FileEntry {
   name: string;
@@ -152,6 +153,7 @@ export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSideba
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
+  useFileWatcher(["notes"], loadFiles);
 
   const openFile = async (path: string) => {
     try {

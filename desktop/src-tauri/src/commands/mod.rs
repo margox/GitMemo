@@ -5,3 +5,4 @@ pub mod notes;
 pub mod search;
 pub mod settings;
 pub mod stats;
+pub mod watcher;

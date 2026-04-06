@@ -11,6 +11,7 @@ import { relativeTime } from "../utils/time";
 import { useI18n } from "../hooks/useI18n";
 import { useToast } from "../hooks/useToast";
 import { usePlatform } from "../hooks/usePlatform";
+import { useFileWatcher } from "../hooks/useFileWatcher";
 
 interface FileEntry {
   name: string;
@@ -42,6 +43,7 @@ export default function PlansPage({ onFocusSidebar: _onFocusSidebar, enterTrigge
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
+  useFileWatcher(["plans"], loadFiles);
 
   const openFile = async (path: string) => {
     try {

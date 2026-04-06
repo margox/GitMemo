@@ -5,6 +5,7 @@ import { useSync } from "../hooks/useSync";
 import { relativeTime, formatAbsoluteTime } from "../utils/time";
 import { Loading } from "../components/Loading";
 import { useRelativeTimeTick } from "../hooks/useRelativeTimeTick";
+import { useFileWatcher } from "../hooks/useFileWatcher";
 import {
   MessageSquare, StickyNote, BookOpen, FileText, Clipboard,
   HardDrive, GitBranch, GitCommit, RefreshCw, Zap, FolderOpen, Terminal, Lightbulb,
@@ -104,6 +105,7 @@ export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page
       loadData();
     }
   }, [isSuccess, isFailed, loadData]);
+  useFileWatcher(["conversations", "notes", "clips", "plans"], loadData);
 
   if (error) {
     return (

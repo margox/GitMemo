@@ -13,6 +13,7 @@ import { relativeTime } from "../utils/time";
 import { useI18n } from "../hooks/useI18n";
 import { useToast } from "../hooks/useToast";
 import { usePlatform } from "../hooks/usePlatform";
+import { useFileWatcher } from "../hooks/useFileWatcher";
 
 interface ClipboardStatus {
   watching: boolean;
@@ -100,6 +101,7 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
     loadStatus();
     loadSavedClips();
   }, [refreshTrigger]);
+  useFileWatcher(["clips"], () => setRefreshTrigger(t => t + 1));
 
   // Event sources that trigger refresh via state
   useEffect(() => {

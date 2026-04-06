@@ -8,6 +8,7 @@ import { CopyPathButton } from "../components/CopyPathButton";
 import { useResizablePanel } from "../hooks/useResizablePanel";
 import { useRelativeTimeTick } from "../hooks/useRelativeTimeTick";
 import { usePlatform } from "../hooks/usePlatform";
+import { useFileWatcher } from "../hooks/useFileWatcher";
 import { formatDateOnly, relativeTime } from "../utils/time";
 import { useI18n } from "../hooks/useI18n";
 import { useToast } from "../hooks/useToast";
@@ -142,6 +143,7 @@ export default function ConversationsPage({ onFocusSidebar, enterTrigger, sideba
       setLoading(false);
     }
   };
+  useFileWatcher(["conversations"], loadFiles);
 
   const applyConversationRaw = useCallback((path: string, raw: string) => {
     const { meta, body } = parseFrontmatter(raw);
