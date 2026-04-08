@@ -268,7 +268,8 @@ export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page
         </div>
       )}
 
-      {/* Git Info — 2 columns */}
+      {/* Git Info — only when remote is configured */}
+      {gitStatus?.git_remote && (
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 16 }}>
         {/* Sync Status */}
         <div style={cardStyle}>
@@ -300,6 +301,7 @@ export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page
           )}
         </div>
       </div>
+      )}
 
       {/* Recent Activity — full width */}
       <div style={{ ...cardStyle, marginBottom: 16 }}>

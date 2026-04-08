@@ -164,6 +164,8 @@ function App() {
   }, [isMobile, navigateAndFocus, sidebarFocused, currentPage, sync]);
 
   const handleSetupComplete = useCallback(() => {
+    // Reset onboarding state so checklist shows for new setup
+    localStorage.removeItem("gitmemo-onboarding-state");
     setInitialized(true);
     sync.refreshGitStatus();
   }, [sync]);

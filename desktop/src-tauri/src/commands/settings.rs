@@ -153,6 +153,20 @@ pub fn set_branch(name: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+pub fn get_ssh_public_key() -> Result<String, String> {
+    let home = std::env::var("HOME").map_err(|_| "HOME not set".to_string())?;
+    let ssh_dir = std::path::PathBuf::from(home).join(".ssh");
+    for name in ["id_ed25519.pub", "id_rsa.pub", "id_ecdsa.pub"] {
+        let path = ssh_dir.join(name);
+        if path.exists() {
+            let key = std::fs::read_to_string(&path).map_err(|e| e.to_string())?;
+            return Ok(key.trim().to_string());
+        }
+    }
+    Err("No SSH public key found".to_string())
+}
+
+#[tauri::command]
 pub fn set_remote(url: String) -> Result<String, String> {
     let config_path = gitmemo_core::utils::config::Config::config_path();
     let mut config = gitmemo_core::utils::config::Config::load(&config_path).map_err(|e| e.to_string())?;

@@ -262,6 +262,12 @@ pub fn list_files(folder: String) -> Result<Vec<FileEntry>, String> {
     if folder == "plans" {
         sync_external_plans_to_gitmemo(&dir);
     }
+    if folder.starts_with("claude-config") {
+        sync_claude_config(&dir);
+    }
+    if folder.starts_with("cursor-config") {
+        sync_cursor_config(&dir);
+    }
     let target = dir.join(&folder);
 
     if !target.exists() {

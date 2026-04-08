@@ -406,65 +406,83 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
           <div style={{ borderTop: "1px solid var(--border)" }} />
 
           {/* Remote repo */}
-          <div style={rowStyle}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
-              <Globe2 size={15} style={{ color: "var(--text-secondary)", flexShrink: 0 }} />
-              <div style={{ minWidth: 0 }}>
-                <p style={{ fontSize: 13, fontWeight: 500 }}>{t("settings.remoteRepo")}</p>
-                <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>{t("settings.remoteRepoDesc")}</p>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={rowStyle}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10, flex: 1, minWidth: 0 }}>
+                <Globe2 size={15} style={{ color: "var(--text-secondary)", flexShrink: 0 }} />
+                <div style={{ minWidth: 0 }}>
+                  <p style={{ fontSize: 13, fontWeight: 500 }}>{t("settings.remoteRepo")}</p>
+                  <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>{t("settings.remoteRepoDesc")}</p>
+                </div>
               </div>
-            </div>
-            {editingRemote ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                <input
-                  autoFocus
-                  value={remoteInput}
-                  onChange={(e) => setRemoteInput(e.target.value)}
-                  onBlur={saveRemote}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter" && !e.nativeEvent.isComposing) void saveRemote();
-                    if (e.key === "Escape") { setEditingRemote(false); setRemoteInput(gitRemote); }
-                  }}
-                  placeholder="git@github.com:user/repo.git"
-                  style={{
-                    width: 280, padding: "4px 8px", borderRadius: 4, fontSize: 11,
-                    background: "var(--bg)", border: "1px solid var(--accent)", color: "var(--text)",
-                    fontFamily: "ui-monospace, monospace",
-                  }}
-                />
-              </div>
-            ) : gitRemote ? (
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <button
-                  type="button"
-                  onClick={() => void copyValue(gitRemote, "gitRemote")}
-                  title={t("common.clickToCopy")}
-                  style={{
-                    display: "flex", alignItems: "center", gap: 6,
-                    maxWidth: 280, padding: "4px 8px", borderRadius: 6,
-                    border: "1px solid var(--border)", background: "var(--bg)",
-                    color: "var(--text-secondary)", cursor: "pointer",
-                  }}
-                >
-                  {copiedField === "gitRemote" ? <Check size={12} style={{ flexShrink: 0, color: "var(--green)" }} /> : <Copy size={12} style={{ flexShrink: 0 }} />}
-                  <span style={{
-                    fontSize: 11, fontFamily: "ui-monospace, monospace",
-                    overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
-                  }} title={gitRemote}>
-                    {gitRemote}
-                  </span>
-                </button>
-                <button
-                  onClick={() => { setRemoteInput(gitRemote); setEditingRemote(true); }}
-                  style={{
-                    padding: "4px 8px", borderRadius: 4, fontSize: 11, cursor: "pointer",
-                    background: "var(--bg-hover)", border: "1px solid var(--border)", color: "var(--text-secondary)",
-                  }}
-                >
-                  {t("conversations.edit")}
-                </button>
-              </div>
-            ) : (
+              {editingRemote ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <input
+                    autoFocus
+                    value={remoteInput}
+                    onChange={(e) => setRemoteInput(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.nativeEvent.isComposing) void saveRemote();
+                      if (e.key === "Escape") { setEditingRemote(false); setRemoteInput(gitRemote); }
+                    }}
+                    placeholder="git@github.com:user/repo.git"
+                    style={{
+                      width: 280, padding: "4px 8px", borderRadius: 4, fontSize: 11,
+                      background: "var(--bg)", border: "1px solid var(--accent)", color: "var(--text)",
+                      fontFamily: "ui-monospace, monospace",
+                    }}
+                  />
+                  <button
+                    onClick={() => void saveRemote()}
+                    style={{
+                      padding: "4px 10px", borderRadius: 4, fontSize: 11, cursor: "pointer",
+                      background: "var(--accent)", border: "none", color: "#fff", fontWeight: 600,
+                    }}
+                  >
+                    {t("conversations.save")}
+                  </button>
+                  <button
+                    onClick={() => { setEditingRemote(false); setRemoteInput(gitRemote); }}
+                    style={{
+                      padding: "4px 8px", borderRadius: 4, fontSize: 11, cursor: "pointer",
+                      background: "var(--bg-hover)", border: "1px solid var(--border)", color: "var(--text-secondary)",
+                    }}
+                  >
+                    {t("common.cancel")}
+                  </button>
+                </div>
+              ) : gitRemote ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <button
+                    type="button"
+                    onClick={() => void copyValue(gitRemote, "gitRemote")}
+                    title={t("common.clickToCopy")}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 6,
+                      maxWidth: 280, padding: "4px 8px", borderRadius: 6,
+                      border: "1px solid var(--border)", background: "var(--bg)",
+                      color: "var(--text-secondary)", cursor: "pointer",
+                    }}
+                  >
+                    {copiedField === "gitRemote" ? <Check size={12} style={{ flexShrink: 0, color: "var(--green)" }} /> : <Copy size={12} style={{ flexShrink: 0 }} />}
+                    <span style={{
+                      fontSize: 11, fontFamily: "ui-monospace, monospace",
+                      overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap",
+                    }} title={gitRemote}>
+                      {gitRemote}
+                    </span>
+                  </button>
+                  <button
+                    onClick={() => { setRemoteInput(gitRemote); setEditingRemote(true); }}
+                    style={{
+                      padding: "4px 8px", borderRadius: 4, fontSize: 11, cursor: "pointer",
+                      background: "var(--bg-hover)", border: "1px solid var(--border)", color: "var(--text-secondary)",
+                    }}
+                  >
+                    {t("conversations.edit")}
+                  </button>
+                </div>
+              ) : (
               <button
                 onClick={() => { setRemoteInput(""); setEditingRemote(true); }}
                 style={{
@@ -474,6 +492,49 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
               >
                 {t("settings.addRemote")}
               </button>
+            )}
+            </div>
+            {/* SSH guidance when editing */}
+            {editingRemote && (
+              <div style={{
+                padding: "12px 16px", borderRadius: 8,
+                background: "var(--bg-hover)", border: "1px solid var(--border)",
+              }}>
+                <p style={{ fontSize: 11, color: "var(--text-secondary)", lineHeight: 1.6, marginBottom: 8 }}>
+                  {t("settings.remoteGuide")}
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                  <button
+                    onClick={() => void invoke<string>("get_ssh_public_key").then(key => {
+                      if (key) {
+                        void writeText(key);
+                        showToast(t("common.copied"));
+                      } else {
+                        showToast("No SSH key found", true);
+                      }
+                    }).catch(() => showToast("No SSH key found", true))}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 4,
+                      padding: "4px 10px", borderRadius: 4, fontSize: 11,
+                      border: "1px solid var(--border)", background: "transparent",
+                      color: "var(--accent)", cursor: "pointer",
+                    }}
+                  >
+                    <Copy size={10} /> {t("settings.copySshKey")}
+                  </button>
+                  <button
+                    onClick={() => void openUrl("https://github.com/new")}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 4,
+                      padding: "4px 10px", borderRadius: 4, fontSize: 11,
+                      border: "1px solid var(--border)", background: "transparent",
+                      color: "var(--text-secondary)", cursor: "pointer",
+                    }}
+                  >
+                    <ExternalLink size={10} /> {t("settings.createRepo")}
+                  </button>
+                </div>
+              </div>
             )}
           </div>
         </div>

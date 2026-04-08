@@ -421,11 +421,12 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
                 <Rocket size={16} /> {t("setup.startSetup")}
               </button>
             </div>
-            {editors.length === 0 && (
-              <p style={{ fontSize: 11, color: "var(--text-secondary)", textAlign: "center", marginTop: 10 }}>
-                {t("setup.skipEditorsHint")}
-              </p>
-            )}
+            <p style={{
+              fontSize: 11, color: "var(--text-secondary)", textAlign: "center", marginTop: 10,
+              visibility: editors.length === 0 ? "visible" : "hidden",
+            }}>
+              {t("setup.skipEditorsHint")}
+            </p>
           </div>
         )}
 
