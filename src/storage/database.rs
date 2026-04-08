@@ -74,6 +74,7 @@ fn frontmatter_time(content: &str) -> Option<String> {
 }
 
 /// Extract tags from frontmatter (supports "tags: a, b, c" and "tags: [a, b, c]")
+#[allow(dead_code)]
 fn frontmatter_tags(content: &str) -> String {
     if !content.starts_with("---") {
         return String::new();

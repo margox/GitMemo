@@ -116,7 +116,8 @@ mod tests {
         let instruction = generate_instruction("~/.gitmemo", Lang::Zh);
         assert!(instruction.contains(MARKER_START));
         assert!(instruction.contains(MARKER_END));
-        assert!(instruction.contains("自动对话记录"));
+        assert!(instruction.contains("GitMemo"));
+        assert!(instruction.contains("自动捕获"));
     }
 
     #[test]
@@ -124,7 +125,8 @@ mod tests {
         let instruction = generate_instruction("~/.gitmemo", Lang::En);
         assert!(instruction.contains(MARKER_START));
         assert!(instruction.contains(MARKER_END));
-        assert!(instruction.contains("Auto Conversation Sync"));
+        assert!(instruction.contains("GitMemo"));
+        assert!(instruction.contains("auto-captured"));
     }
 
     #[test]
