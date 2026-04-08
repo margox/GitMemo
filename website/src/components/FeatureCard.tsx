@@ -8,7 +8,7 @@ interface Props {
 
 export default function FeatureCard({ icon, title, description }: Props) {
   return (
-    <div className="glass-card p-6 hover:border-[rgba(0,122,255,0.2)] transition-colors duration-300">
+    <div className="glass-card p-6 h-full hover:border-[rgba(0,122,255,0.2)] transition-colors duration-300">
       <div className="w-10 h-10 rounded-lg bg-[rgba(0,122,255,0.1)] flex items-center justify-center text-accent mb-4">
         {icon}
       </div>
