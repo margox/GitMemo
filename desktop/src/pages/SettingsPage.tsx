@@ -505,6 +505,17 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
                 </p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                   <button
+                    onClick={() => void openUrl("https://github.com/new")}
+                    style={{
+                      display: "flex", alignItems: "center", gap: 4,
+                      padding: "4px 10px", borderRadius: 4, fontSize: 11,
+                      border: "1px solid var(--border)", background: "transparent",
+                      color: "var(--text-secondary)", cursor: "pointer",
+                    }}
+                  >
+                    <ExternalLink size={10} /> {t("settings.createRepo")}
+                  </button>
+                  <button
                     onClick={() => void invoke<string>("get_ssh_public_key").then(key => {
                       if (key) {
                         void writeText(key);
@@ -521,17 +532,6 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
                     }}
                   >
                     <Copy size={10} /> {t("settings.copySshKey")}
-                  </button>
-                  <button
-                    onClick={() => void openUrl("https://github.com/new")}
-                    style={{
-                      display: "flex", alignItems: "center", gap: 4,
-                      padding: "4px 10px", borderRadius: 4, fontSize: 11,
-                      border: "1px solid var(--border)", background: "transparent",
-                      color: "var(--text-secondary)", cursor: "pointer",
-                    }}
-                  >
-                    <ExternalLink size={10} /> {t("settings.createRepo")}
                   </button>
                 </div>
               </div>
