@@ -157,6 +157,20 @@ fn run_full_sync(dir: &std::path::Path) -> Result<String, String> {
     } else if pulled {
         Ok("已拉取最新".into())
     } else {
+        // Check if repo is diverged — don't report "no changes" when it's actually broken
+        if git::has_remote(dir) {
+            let (ahead, behind) = git::ahead_behind(dir).unwrap_or((0, 0));
+            if ahead > 0 && behind > 0 {
+                return Err(format!("同步冲突: {} ahead, {} behind — 需要手动解决", ahead, behind));
+            } else if behind > 0 {
+                return Err(format!("拉取失败: {} commits behind", behind));
+            } else if ahead > 0 {
+                if let Some(err) = result.push_error {
+                    return Err(format!("推送失败: {}", err));
+                }
+                return Err(format!("推送失败: {} commits unpushed", ahead));
+            }
+        }
         Ok("无新变更".into())
     }
 }

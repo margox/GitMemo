@@ -202,6 +202,7 @@ function App() {
           focused={sidebarFocused}
           syncing={sync.isSyncing}
           syncMsg={sync.message}
+          syncFailed={sync.isFailed}
           onSync={sync.triggerSync}
         />
       )}

@@ -77,9 +77,9 @@ const useSyncStore = create<SyncStore>((set, get) => ({
       const remaining = Math.max(1000 - (Date.now() - start), 0);
       if (resetTimer) clearTimeout(resetTimer);
       resetTimer = window.setTimeout(() => {
-        set({ state: "failed", message: `Error: ${e}` });
+        set({ state: "failed", message: `${e}` });
         void refreshGitStatus();
-        resetTimer = window.setTimeout(() => set({ state: "idle", message: "" }), 3000);
+        resetTimer = window.setTimeout(() => set({ state: "idle", message: "" }), 5000);
       }, remaining);
     }
   },
