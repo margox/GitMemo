@@ -121,11 +121,35 @@ export function OnboardingChecklist({
     void doStartClipboard();
   }, [privacy.isConfirmed, doStartClipboard]);
 
-  if (state.dismissed) return null;
-
   const allItems = ["install", "note", "clipboard", "remote", "editor"];
   const completedCount = allItems.filter(id => state.completed.includes(id)).length;
   const allDone = completedCount === allItems.length;
+
+  // Auto-dismiss countdown when all done
+  const [countdown, setCountdown] = useState<number | null>(null);
+  useEffect(() => {
+    if (!allDone || state.dismissed) {
+      setCountdown(null);
+      return;
+    }
+    setCountdown(5);
+    const timer = setInterval(() => {
+      setCountdown(prev => {
+        if (prev === null || prev <= 1) {
+          clearInterval(timer);
+          // Auto-dismiss
+          const newState = { ...state, dismissed: true };
+          setState(newState);
+          saveState(newState);
+          return null;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [allDone]);
+
+  if (state.dismissed) return null;
 
   const items: ChecklistItem[] = [
     {
@@ -204,7 +228,7 @@ export function OnboardingChecklist({
             color: "var(--text-secondary)", fontSize: 11, cursor: "pointer",
           }}
         >
-          <X size={12} /> {t("onboarding.dismiss")}
+          <X size={12} /> {allDone && countdown !== null ? `${countdown}s` : t("onboarding.dismiss")}
         </button>
       </div>
 
