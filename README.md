@@ -91,7 +91,7 @@ cargo install --path .
 
 </details>
 
-> Desktop releases are currently macOS-only (`.dmg` / `.app.tar.gz`). CI still runs Rust tests on Ubuntu and macOS, but packaged desktop artifacts are only produced for macOS for now.
+> Desktop releases are currently macOS-only (`.dmg` / `.app.tar.gz`). CLI binaries are available for both macOS and Linux.
 
 ### Initialize
 
@@ -134,7 +134,7 @@ After `gitmemo init`, open GitMemo Desktop and it will read the same sync direct
 
 ### How Conversations Are Saved
 
-Type `/save` in any Claude conversation to save the current session. Claude may also auto-save after responses (driven by CLAUDE.md instruction, not guaranteed).
+Type `/save` in any Claude conversation to save the current session. Claude also auto-saves after most responses (driven by CLAUDE.md instruction). If a session wasn't captured, `/save` is your safety net.
 
 ### Verify It Works
 

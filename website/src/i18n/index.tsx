@@ -206,7 +206,7 @@ const zh: Record<string, string> = {
   'capture.subtitle': 'GitMemo 捕获 AI 产出的 8 类知识产物——对话、计划、调研、设计、剪贴板、文件、记忆、技能。全部是 Git 中的纯 Markdown。',
   'capture.conversations': '对话记录',
   'capture.conversations.desc': '每轮 AI 对话，自动保存为 Markdown',
-  'capture.plans': '\u8BA1\u5212\u6587\u4EF6',
+  'capture.plans': '计划文件',
   'capture.plans.desc': 'Plan Mode 的实施方案',
   'capture.research': '调研 & 分析',
   'capture.research.desc': '竞品分析、技术选型调研报告',

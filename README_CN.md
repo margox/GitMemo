@@ -91,7 +91,7 @@ cargo install --path .
 
 </details>
 
-> 当前桌面端发布包仅提供 macOS（`.dmg` / `.app.tar.gz`）。CI 仍会在 Ubuntu 和 macOS 上跑 Rust 测试，但桌面端正式产物暂时只构建 macOS。
+> 当前桌面端发布包仅提供 macOS（`.dmg` / `.app.tar.gz`）。CLI 二进制同时支持 macOS 和 Linux。
 
 ### 初始化
 
@@ -134,7 +134,7 @@ gitmemo init --path /path/to/your/repo
 
 ### 对话如何保存
 
-在 Claude 对话中输入 `/save` 即可保存当前会话。Claude 有时也会自动保存（由 CLAUDE.md 指令驱动，不保证每次触发）。
+在 Claude 对话中输入 `/save` 即可保存当前会话。Claude 在大多数对话后也会自动保存（由 CLAUDE.md 指令驱动）。如果某次会话未被自动捕获，`/save` 是你的兜底方案。
 
 ### 验证是否生效
 
