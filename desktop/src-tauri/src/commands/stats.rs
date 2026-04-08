@@ -1,16 +1,29 @@
-use gitmemo_core::storage::{database, files, git};
+use gitmemo_core::storage::{files, git};
 use serde::Serialize;
+use std::path::Path;
 
 fn local_timestamp(now: &chrono::DateTime<chrono::Local>) -> String {
     now.to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
 }
 
+/// Count .md files under a directory (recursive).
+fn count_md_files(dir: &Path) -> usize {
+    if !dir.exists() {
+        return 0;
+    }
+    walkdir::WalkDir::new(dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
+        .count()
+}
+
 #[derive(Debug, Serialize)]
 pub struct AppStats {
-    pub conversations: u32,
-    pub daily_notes: u32,
-    pub manuals: u32,
-    pub scratch_notes: u32,
+    pub conversations: usize,
+    pub daily_notes: usize,
+    pub manuals: usize,
+    pub scratch_notes: usize,
     pub clips: usize,
     pub plans: usize,
     pub total_size_kb: f64,
@@ -37,21 +50,6 @@ pub fn get_stats() -> Result<AppStats, String> {
         return Err("GitMemo 未初始化".into());
     }
 
-    let db_path = sync_dir.join(".metadata").join("index.db");
-    let conn = database::open_or_create(&db_path).map_err(|e| e.to_string())?;
-    // Auto-rebuild index if empty (e.g. first load after init)
-    let stats = database::get_stats(&conn).map_err(|e| e.to_string())?;
-    let stats = if stats.conversation_count == 0
-        && stats.note_daily_count == 0
-        && stats.note_manual_count == 0
-        && stats.note_scratch_count == 0
-    {
-        database::build_index(&conn, &sync_dir).ok();
-        database::get_stats(&conn).map_err(|e| e.to_string())?
-    } else {
-        stats
-    };
-
     let total_size: u64 = walkdir::WalkDir::new(&sync_dir)
         .into_iter()
         .filter_map(|e| e.ok())
@@ -60,39 +58,13 @@ pub fn get_stats() -> Result<AppStats, String> {
         .map(|m| m.len())
         .sum();
 
-    let clips = {
-        let clips_dir = sync_dir.join("clips");
-        if clips_dir.exists() {
-            walkdir::WalkDir::new(&clips_dir)
-                .into_iter()
-                .filter_map(|e| e.ok())
-                .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
-                .count()
-        } else {
-            0
-        }
-    };
-
-    let plans = {
-        let plans_dir = sync_dir.join("plans");
-        if plans_dir.exists() {
-            walkdir::WalkDir::new(&plans_dir)
-                .into_iter()
-                .filter_map(|e| e.ok())
-                .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
-                .count()
-        } else {
-            0
-        }
-    };
-
     Ok(AppStats {
-        conversations: stats.conversation_count,
-        daily_notes: stats.note_daily_count,
-        manuals: stats.note_manual_count,
-        scratch_notes: stats.note_scratch_count,
-        clips,
-        plans,
+        conversations: count_md_files(&sync_dir.join("conversations")),
+        daily_notes: count_md_files(&sync_dir.join("notes").join("daily")),
+        manuals: count_md_files(&sync_dir.join("notes").join("manual")),
+        scratch_notes: count_md_files(&sync_dir.join("notes").join("scratch")),
+        clips: count_md_files(&sync_dir.join("clips")),
+        plans: count_md_files(&sync_dir.join("plans")),
         total_size_kb: total_size as f64 / 1024.0,
     })
 }
