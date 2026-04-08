@@ -19,3 +19,4 @@
 ### UX 改进
 
 - [x] **列表手动刷新按钮**：对话和计划页面增加 RefreshCw 按钮，作为 file watcher 的手动兜底 (2026-04-08)
+- [ ] **文件链路全链路 Review**：从外部写入（Claude Code / Cursor hook）→ file watcher 检测 → 前端列表刷新 → 文件展示，排查每个环节的可靠性，确保外部写入的文件能稳定、及时地出现在 App 中
