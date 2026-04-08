@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { Loading } from "../components/Loading";
-import { MessageSquare, Trash2, ChevronLeft, Pencil, Save, X } from "lucide-react";
+import { MessageSquare, Trash2, ChevronLeft, Pencil, Save, X, RefreshCw } from "lucide-react";
 import MarkdownView from "../components/MarkdownView";
 import { CopyPathButton } from "../components/CopyPathButton";
 import { useResizablePanel } from "../hooks/useResizablePanel";
@@ -284,6 +284,18 @@ export default function ConversationsPage({ onFocusSidebar, enterTrigger, sideba
         }}>
           <MessageSquare size={18} style={{ color: "var(--accent)" }} />
           <span style={{ fontSize: 15, fontWeight: 700, flex: 1 }}>{t("conversations.title")}</span>
+          <button
+            onClick={() => loadFiles()}
+            title={t("common.refresh")}
+            style={{
+              background: "none", border: "none", cursor: "pointer", padding: 4, borderRadius: 4,
+              color: "var(--text-secondary)", display: "flex", alignItems: "center",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-secondary)")}
+          >
+            <RefreshCw size={14} />
+          </button>
           <span style={{
             fontSize: 11, color: "var(--text-secondary)", background: "var(--bg-hover)",
             padding: "2px 8px", borderRadius: 10,

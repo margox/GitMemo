@@ -186,7 +186,8 @@
     "copied": "Copied",
     "clickToCopy": "Click to copy",
     "copyPath": "Copy full path on this device",
-    "pathCopied": "Path copied"
+    "pathCopied": "Path copied",
+    "refresh": "Refresh"
   },
   "claudeConfig": {
     "memory": "Memory",
