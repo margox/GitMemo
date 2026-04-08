@@ -153,6 +153,24 @@ pub fn set_branch(name: String) -> Result<String, String> {
 }
 
 #[tauri::command]
+pub fn test_remote_sync() -> Result<String, String> {
+    let sync_dir = files::sync_dir();
+    if !sync_dir.exists() {
+        return Err("GitMemo not initialized".into());
+    }
+    // Write a test file, commit, and push
+    let test_path = sync_dir.join("notes/scratch/.sync-test");
+    std::fs::write(&test_path, format!("sync test at {:?}\n", std::time::SystemTime::now()))
+        .map_err(|e| format!("Write failed: {e}"))?;
+    git::commit_and_push(&sync_dir, "test: sync connection test")
+        .map_err(|e| format!("Push failed: {e}"))?;
+    // Clean up test file
+    let _ = std::fs::remove_file(&test_path);
+    let _ = git::commit_and_push(&sync_dir, "test: cleanup sync test");
+    Ok("Sync OK".to_string())
+}
+
+#[tauri::command]
 pub fn get_ssh_public_key() -> Result<String, String> {
     let home = std::env::var("HOME").map_err(|_| "HOME not set".to_string())?;
     let ssh_dir = std::path::PathBuf::from(home).join(".ssh");

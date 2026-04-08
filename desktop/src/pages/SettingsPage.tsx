@@ -481,6 +481,19 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
                   >
                     {t("conversations.edit")}
                   </button>
+                  <button
+                    onClick={() => {
+                      invoke<string>("test_remote_sync")
+                        .then(msg => showToast(msg))
+                        .catch(e => showToast(`${e}`, true));
+                    }}
+                    style={{
+                      padding: "4px 8px", borderRadius: 4, fontSize: 11, cursor: "pointer",
+                      background: "var(--bg-hover)", border: "1px solid var(--border)", color: "var(--green)",
+                    }}
+                  >
+                    {t("settings.testSync")}
+                  </button>
                 </div>
               ) : (
               <button

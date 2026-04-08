@@ -106,12 +106,6 @@ export function OnboardingChecklist({
     saveState(newState);
   }, [state]);
 
-  if (state.dismissed) return null;
-
-  const allItems = ["install", "note", "clipboard", "remote", "editor"];
-  const completedCount = allItems.filter(id => state.completed.includes(id)).length;
-  const allDone = completedCount === allItems.length;
-
   const doStartClipboard = useCallback(async () => {
     try {
       await invoke("start_clipboard_watch");
@@ -126,6 +120,12 @@ export function OnboardingChecklist({
     }
     void doStartClipboard();
   }, [privacy.isConfirmed, doStartClipboard]);
+
+  if (state.dismissed) return null;
+
+  const allItems = ["install", "note", "clipboard", "remote", "editor"];
+  const completedCount = allItems.filter(id => state.completed.includes(id)).length;
+  const allDone = completedCount === allItems.length;
 
   const items: ChecklistItem[] = [
     {

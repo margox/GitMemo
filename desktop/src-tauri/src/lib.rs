@@ -86,6 +86,7 @@ pub fn run() {
             settings::get_branch,
             settings::set_branch,
             settings::set_remote,
+            settings::test_remote_sync,
             settings::get_ssh_public_key,
             settings::get_claude_integration_status,
             settings::setup_claude_integration,
