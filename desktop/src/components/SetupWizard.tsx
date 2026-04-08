@@ -126,7 +126,7 @@ export function SetupWizard({ onComplete }: { onComplete: () => void }) {
     display: "flex",
     alignItems: "flex-start",
     justifyContent: "center",
-    minHeight: "100%",
+    height: "100%",
     padding: "24px",
     overflowY: "auto",
   };
