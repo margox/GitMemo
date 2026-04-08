@@ -125,7 +125,7 @@ export function SetupWizard({ onComplete }: { onComplete: (needsRemoteSync?: boo
 
   const containerStyle: React.CSSProperties = {
     display: "flex",
-    alignItems: "flex-start",
+    alignItems: "center",
     justifyContent: "center",
     height: "100%",
     padding: "24px",
@@ -553,6 +553,18 @@ export function SetupWizard({ onComplete }: { onComplete: (needsRemoteSync?: boo
                     })()}
                   </div>
                 )}
+
+                {/* Tip: /save command */}
+                <div style={{
+                  marginBottom: 16, padding: "10px 14px",
+                  borderRadius: 8, background: "var(--accent)08",
+                  border: "1px solid var(--accent)20",
+                  fontSize: 12, color: "var(--text-secondary)", lineHeight: 1.6,
+                }}>
+                  <span style={{ fontWeight: 600, color: "var(--text)" }}>💡 {t("setup.tipTitle")}</span>
+                  <br />
+                  {t("setup.tipSave")}
+                </div>
 
                 <button style={btnPrimary} onClick={() => onComplete(result?.needs_remote_sync)}>
                   {t("setup.enterApp")} <ChevronRight size={16} />

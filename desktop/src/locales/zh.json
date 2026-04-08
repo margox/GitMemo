@@ -259,6 +259,8 @@
     "openDeployKeys": "打开 GitHub Deploy Keys 页面",
     "copy": "复制",
     "copied": "已复制！",
-    "enterApp": "进入 GitMemo"
+    "enterApp": "进入 GitMemo",
+    "tipTitle": "小提示",
+    "tipSave": "在 Claude Code 或 Cursor 中输入 /save 即可随时手动保存当前对话。"
   }
 }

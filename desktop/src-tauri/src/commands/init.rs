@@ -247,7 +247,8 @@ fn inject_settings_hook(settings_path: &std::path::Path, sync_dir: &str) -> Resu
     }
 
     let content = if settings_path.exists() {
-        std::fs::read_to_string(settings_path).map_err(|e| e.to_string())?
+        let raw = std::fs::read_to_string(settings_path).map_err(|e| e.to_string())?;
+        if raw.trim().is_empty() { "{}".to_string() } else { raw }
     } else {
         "{}".to_string()
     };
@@ -345,7 +346,8 @@ fn inject_cursor_mcp(cursor_mcp: &std::path::Path) -> Result<(), String> {
     }
 
     let content = if cursor_mcp.exists() {
-        std::fs::read_to_string(cursor_mcp).map_err(|e| e.to_string())?
+        let raw = std::fs::read_to_string(cursor_mcp).map_err(|e| e.to_string())?;
+        if raw.trim().is_empty() { "{}".to_string() } else { raw }
     } else {
         "{}".to_string()
     };

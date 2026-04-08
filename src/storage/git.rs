@@ -71,6 +71,13 @@ pub fn init_repo(repo_path: &Path, remote_url: &str) -> Result<git2::Repository>
         repo
     } else {
         let repo = git2::Repository::init(repo_path)?;
+        // Ensure default branch is "main" regardless of system git config
+        let _ = std::process::Command::new("git")
+            .args(["branch", "-m", "main"])
+            .current_dir(repo_path)
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status();
         if !remote_url.is_empty() {
             repo.remote("origin", remote_url)?;
         }
@@ -144,6 +151,7 @@ pub fn setup_tracking(repo_path: &Path, branch: &str) {
 /// Stage all changes, commit, and push. Returns sync result.
 /// Commit staged changes without pushing. Used during init when remote
 /// SSH keys may not be configured yet.
+#[allow(dead_code)]
 pub fn commit_only(repo_path: &Path, message: &str) -> Result<SyncResult> {
     let _ = ensure_repo_clean(repo_path);
     let repo = git2::Repository::open(repo_path)?;

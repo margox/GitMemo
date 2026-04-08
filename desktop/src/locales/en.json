@@ -259,6 +259,8 @@
     "openDeployKeys": "Open GitHub Deploy Keys",
     "copy": "Copy",
     "copied": "Copied!",
-    "enterApp": "Enter GitMemo"
+    "enterApp": "Enter GitMemo",
+    "tipTitle": "Quick Tip",
+    "tipSave": "Type /save in Claude Code or Cursor to manually save the current conversation anytime."
   }
 }
