@@ -69,7 +69,7 @@ export default function Sidebar({ currentPage, onNavigate, focused, syncing, syn
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-          <img src="/logo.png" alt="GitMemo" style={{ width: 22, height: 22, borderRadius: 4 }} />
+          <img src="/logo.png" alt="GitMemo" style={{ width: 22, height: 22, borderRadius: 5 }} />
           <span style={{ fontWeight: 700, fontSize: 15 }}>GitMemo</span>
         </div>
       </div>
@@ -119,17 +119,17 @@ export default function Sidebar({ currentPage, onNavigate, focused, syncing, syn
             gap: 8,
             width: "100%",
             padding: "8px 0",
-            borderRadius: 4,
+            borderRadius: 6,
             fontSize: 12,
             background: syncing
               ? "linear-gradient(90deg, var(--bg-hover) 0%, var(--accent) 50%, var(--bg-hover) 100%)"
               : syncMsg
-              ? "rgba(48, 209, 88, 0.15)"
+              ? "#0f2d0f"
               : "var(--bg)",
             backgroundSize: syncing ? "200% 100%" : undefined,
             animation: syncing ? "shimmer 1.5s linear infinite" : undefined,
             color: syncing ? "#fff" : syncMsg ? "var(--green)" : "var(--text-secondary)",
-            border: `1px solid ${syncing ? "transparent" : syncMsg ? "#2a5a2a" : "var(--border)"}`,
+            border: `1px solid ${syncing ? "transparent" : syncMsg ? "#205a20" : "var(--border)"}`,
             cursor: syncing ? "default" : "pointer",
             transition: "all 0.3s",
           }}

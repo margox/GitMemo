@@ -22,9 +22,7 @@ initSyncListeners();
 
 const theme = createTheme({
   primaryColor: "blue",
-  fontFamily: '"Berkeley Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace',
-  fontFamilyMonospace: '"Berkeley Mono", "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-  defaultRadius: 4,
+  fontFamily: "inherit",
 });
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(

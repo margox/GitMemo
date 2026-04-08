@@ -41,15 +41,16 @@ export function ClipboardPrivacyDialog({
           width: "100%",
           maxWidth: 420,
           padding: "28px 24px",
-          borderRadius: 4,
+          borderRadius: 14,
           background: "var(--bg-card)",
-          border: "1px solid var(--border-outline)",
+          border: "1px solid var(--border)",
+          boxShadow: "0 16px 48px rgba(0,0,0,0.3)",
         }}
       >
         {/* Header */}
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 20 }}>
           <div style={{
-            width: 40, height: 40, borderRadius: 4,
+            width: 40, height: 40, borderRadius: 10,
             background: "var(--accent)15",
             display: "flex", alignItems: "center", justifyContent: "center",
           }}>
@@ -79,7 +80,7 @@ export function ClipboardPrivacyDialog({
         <div style={{
           display: "flex", flexDirection: "column", gap: 12,
           marginBottom: 24, padding: "16px",
-          borderRadius: 4, background: "var(--bg-hover)",
+          borderRadius: 10, background: "var(--bg-hover)",
         }}>
           {["privacy.point1", "privacy.point2", "privacy.point3", "privacy.point4"].map(key => (
             <div key={key} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
@@ -96,7 +97,7 @@ export function ClipboardPrivacyDialog({
           <button
             onClick={onCancel}
             style={{
-              flex: 1, padding: "10px 16px", borderRadius: 4,
+              flex: 1, padding: "10px 16px", borderRadius: 8,
               border: "1px solid var(--border)", background: "transparent",
               color: "var(--text)", fontSize: 13, fontWeight: 600,
               cursor: "pointer",
@@ -107,9 +108,9 @@ export function ClipboardPrivacyDialog({
           <button
             onClick={onConfirm}
             style={{
-              flex: 1, padding: "10px 16px", borderRadius: 4,
+              flex: 1, padding: "10px 16px", borderRadius: 8,
               border: "none", background: "var(--accent)",
-              color: "var(--text)", fontSize: 13, fontWeight: 600,
+              color: "#fff", fontSize: 13, fontWeight: 600,
               cursor: "pointer",
             }}
           >
