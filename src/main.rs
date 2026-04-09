@@ -43,6 +43,7 @@ fn main() -> Result<()> {
         Commands::Branch { name } => commands::cmd_branch(&sync_dir, name)?,
         Commands::Remote { url, remove } => commands::cmd_remote(&sync_dir, url, remove)?,
         Commands::Capture { project, dry_run, quiet } => commands::cmd_capture(&sync_dir, project, dry_run, quiet)?,
+        Commands::Upgrade { check } => commands::cmd_upgrade(check)?,
     }
 
     Ok(())

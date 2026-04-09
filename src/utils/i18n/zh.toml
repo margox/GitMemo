@@ -1,3 +1,19 @@
+# ── Upgrade command ─────────────────────────────────────────
+
+upgrade.checking = "正在检查更新..."
+upgrade.current = "当前版本:"
+upgrade.latest = "最新版本:"
+upgrade.already_latest = "✓ 已是最新版本"
+upgrade.new_available = "发现新版本！运行以下命令升级:"
+upgrade.downloading = "正在下载新版本..."
+upgrade.installing = "正在安装到:"
+upgrade.success = "✓ 升级成功！"
+upgrade.version = "版本:"
+upgrade.need_sudo = "需要管理员权限，正在请求 sudo..."
+upgrade.path_warning = "⚠ 注意: 更新的二进制文件位置与当前运行的不同"
+upgrade.old_path = "旧路径:"
+upgrade.new_path = "新路径:"
+
 # ── Init command ─────────────────────────────────────────
 
 init_title = "GitMemo 初始化"

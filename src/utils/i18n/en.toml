@@ -1,3 +1,19 @@
+# ── Upgrade command ─────────────────────────────────────────
+
+upgrade.checking = "Checking for updates..."
+upgrade.current = "Current version:"
+upgrade.latest = "Latest version:"
+upgrade.already_latest = "✓ Already on the latest version"
+upgrade.new_available = "New version available! Run the following to upgrade:"
+upgrade.downloading = "Downloading new version..."
+upgrade.installing = "Installing to:"
+upgrade.success = "✓ Upgrade successful!"
+upgrade.version = "Version:"
+upgrade.need_sudo = "Administrator privileges required, requesting sudo..."
+upgrade.path_warning = "⚠ Warning: Updated binary location differs from currently running binary"
+upgrade.old_path = "Old path:"
+upgrade.new_path = "New path:"
+
 # ── Init command ─────────────────────────────────────────
 
 init_title = "GitMemo Setup"

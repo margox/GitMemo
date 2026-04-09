@@ -154,4 +154,11 @@ pub enum Commands {
         #[arg(long)]
         quiet: bool,
     },
+
+    /// Upgrade gitmemo to the latest version
+    Upgrade {
+        /// Show available version without installing
+        #[arg(long)]
+        check: bool,
+    },
 }

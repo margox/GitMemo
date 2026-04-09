@@ -247,6 +247,22 @@ impl I18n {
     pub fn not_init_error(&self) -> &str { self.s("not_init_error") }
     pub fn not_init_error_mcp(&self) -> &str { self.s("not_init_error_mcp") }
 
+    // ── Upgrade command ─────────────────────────────────────
+
+    pub fn upgrade_checking(&self) -> &str { self.s("upgrade.checking") }
+    pub fn upgrade_current(&self) -> &str { self.s("upgrade.current") }
+    pub fn upgrade_latest(&self) -> &str { self.s("upgrade.latest") }
+    pub fn upgrade_already_latest(&self) -> &str { self.s("upgrade.already_latest") }
+    pub fn upgrade_new_available(&self) -> &str { self.s("upgrade.new_available") }
+    pub fn upgrade_downloading(&self) -> &str { self.s("upgrade.downloading") }
+    pub fn upgrade_installing(&self) -> &str { self.s("upgrade.installing") }
+    pub fn upgrade_success(&self) -> &str { self.s("upgrade.success") }
+    pub fn upgrade_version(&self) -> &str { self.s("upgrade.version") }
+    pub fn upgrade_need_sudo(&self) -> &str { self.s("upgrade.need_sudo") }
+    pub fn upgrade_path_warning(&self) -> &str { self.s("upgrade.path_warning") }
+    pub fn upgrade_old_path(&self) -> &str { self.s("upgrade.old_path") }
+    pub fn upgrade_new_path(&self) -> &str { self.s("upgrade.new_path") }
+
     // ── MCP tool descriptions ───────────────────────────────
 
     pub fn mcp_search_desc(&self) -> &str { self.s("mcp_search_desc") }
