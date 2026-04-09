@@ -20,10 +20,10 @@ fn main() -> Result<()> {
     let sync_dir = storage::files::sync_dir();
 
     // Pull latest from remote on startup (skip for init/uninstall/mcp-serve/capture)
-    if !matches!(cli.command, Commands::Init { .. } | Commands::Uninstall { .. } | Commands::McpServe | Commands::Capture { .. }) {
-        if sync_dir.exists() {
-            let _ = storage::git::pull(&sync_dir);
-        }
+    if !matches!(cli.command, Commands::Init { .. } | Commands::Uninstall { .. } | Commands::McpServe | Commands::Capture { .. })
+        && sync_dir.exists()
+    {
+        let _ = storage::git::pull(&sync_dir);
     }
 
     match cli.command {
