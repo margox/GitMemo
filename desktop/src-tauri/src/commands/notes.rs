@@ -6,6 +6,11 @@ use tauri::{AppHandle, Emitter};
 
 static APP_HANDLE: OnceLock<AppHandle> = OnceLock::new();
 
+/// Content folders that the frontend watches for changes.
+const CONTENT_FOLDERS: &[&str] = &[
+    "conversations", "notes", "clips", "plans", "claude-config", "cursor-config",
+];
+
 fn local_timestamp(now: &chrono::DateTime<chrono::Local>) -> String {
     now.to_rfc3339_opts(chrono::SecondsFormat::Secs, false)
 }
@@ -100,6 +105,19 @@ fn preview_from_body(body: &str) -> String {
         .collect::<String>()
 }
 
+/// Notify the frontend that content folders may have changed.
+/// Used after git pull / commit so pages refresh even if OS file-watcher misses events.
+fn emit_files_changed() {
+    if let Some(handle) = APP_HANDLE.get() {
+        for folder in CONTENT_FOLDERS {
+            let _ = handle.emit(
+                "files-changed",
+                serde_json::json!({ "folder": folder }),
+            );
+        }
+    }
+}
+
 /// Spawn git commit+push in background so the UI isn't blocked.
 /// Emits "git-sync-start" and "git-sync-end" events for the frontend.
 fn bg_commit_and_push(msg: String) {
@@ -129,12 +147,19 @@ fn bg_commit_and_push(msg: String) {
         if let Some(handle) = APP_HANDLE.get() {
             let _ = handle.emit("git-sync-end", &sync_event);
         }
+        // Notify pages to refresh (file watcher may miss git-internal file ops)
+        emit_files_changed();
     });
 }
 
 fn run_full_sync(dir: &std::path::Path) -> Result<String, String> {
     // Pull latest from remote first (even if no local changes)
     let pulled = git::pull(dir).unwrap_or(false);
+
+    // Notify frontend immediately so pages refresh with pulled data
+    if pulled {
+        emit_files_changed();
+    }
 
     // Copy plans from editor workspaces to plans/
     sync_external_plans_to_gitmemo(dir);
