@@ -216,12 +216,15 @@ fn call_tool(name: &str, args: &Value) -> Result<String> {
 
     let db_path = sync_dir.join(".metadata").join("index.db");
     let conn = database::open_or_create(&db_path)?;
-    database::build_index(&conn, &sync_dir)?;
+    database::build_index_if_needed(&conn, &sync_dir)?;
 
     match name {
         "cds_search" => {
             let query = args["query"].as_str().unwrap_or("");
             let type_filter = args["type"].as_str().unwrap_or("all");
+            if !["all", "conversation", "note"].contains(&type_filter) {
+                anyhow::bail!("Invalid type filter: {}", type_filter);
+            }
             let limit = args["limit"].as_u64().unwrap_or(10) as usize;
 
             let results = database::search(&conn, query, type_filter, limit)?;

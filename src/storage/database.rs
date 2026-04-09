@@ -48,6 +48,11 @@ fn init_schema(conn: &Connection) -> Result<()> {
             content,
             tokenize='unicode61'
         );
+
+        CREATE TABLE IF NOT EXISTS metadata (
+            key   TEXT PRIMARY KEY,
+            value TEXT NOT NULL
+        );
         ",
     )?;
     Ok(())
@@ -223,31 +228,77 @@ pub fn build_index(conn: &Connection, sync_dir: &Path) -> Result<u32> {
     Ok(count)
 }
 
-/// Full-text search
-pub fn search(conn: &Connection, query: &str, type_filter: &str, limit: usize) -> Result<Vec<SearchResult>> {
-    let sql = if type_filter == "all" {
-        "SELECT d.source_type, d.title, d.file_path, snippet(search_index, 2, '**', '**', '...', 20) as snip, d.created_at
-         FROM search_index si
-         JOIN documents d ON d.id = si.doc_id
-         WHERE search_index MATCH ?1
-         ORDER BY rank
-         LIMIT ?2"
-            .to_string()
-    } else {
-        format!(
-            "SELECT d.source_type, d.title, d.file_path, snippet(search_index, 2, '**', '**', '...', 20) as snip, d.created_at
-             FROM search_index si
-             JOIN documents d ON d.id = si.doc_id
-             WHERE search_index MATCH ?1 AND d.source_type = '{}'
-             ORDER BY rank
-             LIMIT ?2",
-            type_filter
-        )
+fn get_last_index_time(conn: &Connection) -> Option<std::time::SystemTime> {
+    conn.query_row(
+        "SELECT value FROM metadata WHERE key = 'last_index_time'",
+        [],
+        |row| {
+            let s: String = row.get(0)?;
+            let epoch_secs: u64 = s.parse().unwrap_or(0);
+            Ok(std::time::UNIX_EPOCH + std::time::Duration::from_secs(epoch_secs))
+        },
+    )
+    .ok()
+}
+
+fn set_last_index_time(conn: &Connection) -> Result<()> {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap()
+        .as_secs();
+    conn.execute(
+        "INSERT OR REPLACE INTO metadata (key, value) VALUES ('last_index_time', ?1)",
+        params![now.to_string()],
+    )?;
+    Ok(())
+}
+
+/// Incremental index: only rebuild if any .md file is newer than the last index time.
+pub fn build_index_if_needed(conn: &Connection, sync_dir: &Path) -> Result<u32> {
+    let last_index = get_last_index_time(conn);
+
+    let needs_rebuild = match last_index {
+        None => true,
+        Some(last_time) => INDEX_ROOTS.iter().any(|&(subdir, _)| {
+            let dir = sync_dir.join(subdir);
+            if !dir.exists() {
+                return false;
+            }
+            walkdir::WalkDir::new(&dir)
+                .into_iter()
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().extension().is_some_and(|ext| ext == "md"))
+                .filter(|e| !skip_index_path(e.path()))
+                .any(|e| {
+                    e.metadata()
+                        .ok()
+                        .and_then(|m| m.modified().ok())
+                        .is_some_and(|mtime| mtime > last_time)
+                })
+        }),
     };
 
-    let mut stmt = conn.prepare(&sql)?;
+    if needs_rebuild {
+        let count = build_index(conn, sync_dir)?;
+        set_last_index_time(conn)?;
+        Ok(count)
+    } else {
+        Ok(0)
+    }
+}
+
+/// Full-text search
+pub fn search(conn: &Connection, query: &str, type_filter: &str, limit: usize) -> Result<Vec<SearchResult>> {
+    let sql = "SELECT d.source_type, d.title, d.file_path, snippet(search_index, 2, '**', '**', '...', 20) as snip, d.created_at
+         FROM search_index si
+         JOIN documents d ON d.id = si.doc_id
+         WHERE search_index MATCH ?1 AND (?3 = 'all' OR d.source_type = ?3)
+         ORDER BY rank
+         LIMIT ?2";
+
+    let mut stmt = conn.prepare(sql)?;
     let results = stmt
-        .query_map(params![query, limit], |row| {
+        .query_map(params![query, limit, type_filter], |row| {
             Ok(SearchResult {
                 source_type: row.get(0)?,
                 title: row.get(1)?,
@@ -267,29 +318,16 @@ pub fn search(conn: &Connection, query: &str, type_filter: &str, limit: usize) -
 pub fn search_like(conn: &Connection, query: &str, type_filter: &str, limit: usize) -> Result<Vec<SearchResult>> {
     let pattern = format!("%{}%", query);
 
-    let sql = if type_filter == "all" {
-        "SELECT d.source_type, d.title, d.file_path, si.content, d.created_at
+    let sql = "SELECT d.source_type, d.title, d.file_path, si.content, d.created_at
          FROM search_index si
          JOIN documents d ON d.id = si.doc_id
-         WHERE si.title LIKE ?1 OR si.content LIKE ?1
+         WHERE (si.title LIKE ?1 OR si.content LIKE ?1) AND (?3 = 'all' OR d.source_type = ?3)
          ORDER BY d.created_at DESC
-         LIMIT ?2"
-            .to_string()
-    } else {
-        format!(
-            "SELECT d.source_type, d.title, d.file_path, si.content, d.created_at
-             FROM search_index si
-             JOIN documents d ON d.id = si.doc_id
-             WHERE (si.title LIKE ?1 OR si.content LIKE ?1) AND d.source_type = '{}'
-             ORDER BY d.created_at DESC
-             LIMIT ?2",
-            type_filter
-        )
-    };
+         LIMIT ?2";
 
-    let mut stmt = conn.prepare(&sql)?;
+    let mut stmt = conn.prepare(sql)?;
     let results = stmt
-        .query_map(params![pattern, limit], |row| {
+        .query_map(params![pattern, limit, type_filter], |row| {
             let content: String = row.get(3)?;
             // Extract a snippet around the match
             let snippet = extract_snippet(&content, query, 60);
