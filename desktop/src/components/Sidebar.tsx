@@ -1,18 +1,16 @@
-import { useEffect, useState } from "react";
-import { invoke } from "@tauri-apps/api/core";
+import { Settings, RefreshCw } from "lucide-react";
 import {
   LayoutDashboard,
   MessageSquare,
   StickyNote,
   Clipboard,
   Search,
-  Settings,
-  RefreshCw,
   Lightbulb,
   Brain,
 } from "lucide-react";
 import type { Page } from "../App";
 import { useI18n } from "../hooks/useI18n";
+import { useAppStore } from "../hooks/useAppStore";
 
 interface SidebarProps {
   currentPage: Page;
@@ -22,11 +20,6 @@ interface SidebarProps {
   syncMsg: string;
   syncFailed: boolean;
   onSync: () => void;
-}
-
-interface AppMeta {
-  version: string;
-  release_time: string;
 }
 
 const navItems: { id: Page; icon: typeof LayoutDashboard; labelKey: string }[] = [
@@ -42,11 +35,7 @@ const navItems: { id: Page; icon: typeof LayoutDashboard; labelKey: string }[] =
 
 export default function Sidebar({ currentPage, onNavigate, focused, syncing, syncMsg, syncFailed, onSync }: SidebarProps) {
   const { t } = useI18n();
-  const [appMeta, setAppMeta] = useState<AppMeta | null>(null);
-
-  useEffect(() => {
-    invoke<AppMeta>("get_app_meta").then(setAppMeta).catch(() => {});
-  }, []);
+  const { appMeta } = useAppStore();
 
   return (
     <div

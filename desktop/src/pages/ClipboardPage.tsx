@@ -15,12 +15,7 @@ import { useToast } from "../hooks/useToast";
 import { usePlatform } from "../hooks/usePlatform";
 import { useFileWatcher } from "../hooks/useFileWatcher";
 import { ClipboardPrivacyDialog, useClipboardPrivacy } from "../components/ClipboardPrivacyDialog";
-
-interface ClipboardStatus {
-  watching: boolean;
-  clips_count: number;
-  clips_dir: string;
-}
+import { useAppStore, type ClipboardStatus } from "../hooks/useAppStore";
 
 interface ClipboardEvent {
   saved: boolean;
@@ -88,7 +83,7 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
   const isMobile = usePlatform() === "mobile";
   useRelativeTimeTick();
   const panel = useResizablePanel("clipboard", 340);
-  const [status, setStatus] = useState<ClipboardStatus | null>(null);
+  const { clipboardStatus: status, refreshClipboardStatus } = useAppStore();
   const [savedClips, setSavedClips] = useState<FileEntry[]>([]);
   const [clipsLoading, setClipsLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -101,7 +96,6 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
 
   // State-driven data loading
   useEffect(() => {
-    loadStatus();
     loadSavedClips();
   }, [refreshTrigger]);
   useFileWatcher(["clips"], () => setRefreshTrigger(t => t + 1));
@@ -116,11 +110,6 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
     return () => { unlisten.then((fn) => fn()); window.removeEventListener("focus", onFocus); };
   }, []);
 
-  const loadStatus = async () => {
-    try { setStatus(await invoke<ClipboardStatus>("get_clipboard_status")); }
-    catch (e) { console.error(e); }
-  };
-
   const loadSavedClips = async () => {
     try { setSavedClips(await invoke<FileEntry[]>("list_files", { folder: "clips" })); }
     catch (e) { console.error(e); }
@@ -130,8 +119,7 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
   const doStartWatch = async () => {
     try {
       await invoke<string>("start_clipboard_watch");
-      loadStatus();
-      window.dispatchEvent(new Event("clipboard-status-changed"));
+      refreshClipboardStatus();
     } catch (e) { showToast(`Error: ${e}`); }
   };
 
@@ -139,8 +127,7 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
     try {
       if (status?.watching) {
         await invoke<string>("stop_clipboard_watch");
-        loadStatus();
-        window.dispatchEvent(new Event("clipboard-status-changed"));
+        refreshClipboardStatus();
       } else {
         // Show privacy dialog on first enable
         if (!privacy.isConfirmed) {
@@ -162,7 +149,7 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
       const result = await invoke<ClipboardEvent>("save_clipboard_now", { content: text });
       showToast(t("clipboard.saved"));
       loadSavedClips();
-      loadStatus();
+      refreshClipboardStatus();
     } catch (e) { showToast(`Error: ${e}`); }
   };
 
@@ -225,7 +212,7 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
         setFileContent("");
       }
       loadSavedClips();
-      loadStatus();
+      refreshClipboardStatus();
     } catch (e) {
       showToast(String(e));
     }

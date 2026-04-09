@@ -4,21 +4,9 @@ import { openUrl } from "@tauri-apps/plugin-opener";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { Settings, Power, Clipboard, Sun, Moon, GitBranch, ExternalLink, Globe, FolderOpen, Globe2, Terminal, Code, Copy, Check, MessageCircle, ScrollText, X } from "lucide-react";
 import { useSync } from "../hooks/useSync";
-import type { Theme } from "../App";
 import { useI18n, type Locale } from "../hooks/useI18n";
 import { useToast } from "../hooks/useToast";
-
-interface DesktopSettings {
-  autostart: boolean;
-  clipboard_autostart: boolean;
-}
-
-interface AppMeta {
-  version: string;
-  release_time: string;
-  requires_cli: boolean;
-  recommended_cli_version: string;
-}
+import { useAppStore } from "../hooks/useAppStore";
 
 function Toggle({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
   return (
@@ -52,22 +40,19 @@ function Toggle({ enabled, onToggle }: { enabled: boolean; onToggle: () => void 
   );
 }
 
-interface SettingsPageProps {
-  theme: Theme;
-  onToggleTheme: () => void;
-}
-
-export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps) {
+export default function SettingsPage() {
   const { t, locale, setLocale } = useI18n();
   const { showToast } = useToast();
   const { gitStatus, refreshGitStatus } = useSync();
-  const [settings, setSettings] = useState<DesktopSettings | null>(null);
+  const {
+    settings, refreshSettings,
+    claudeEnabled, cursorEnabled, refreshIntegrationStatus,
+    theme, toggleTheme,
+    appMeta,
+  } = useAppStore();
   const [branch, setBranch] = useState("");
   const [branchInput, setBranchInput] = useState("");
   const [editingBranch, setEditingBranch] = useState(false);
-  const [claudeEnabled, setClaudeEnabled] = useState(false);
-  const [cursorEnabled, setCursorEnabled] = useState(false);
-  const [appMeta, setAppMeta] = useState<AppMeta | null>(null);
   const syncDir = gitStatus?.sync_dir ?? "";
   const gitRemote = gitStatus?.git_remote ?? "";
   const [copiedField, setCopiedField] = useState<"syncDir" | "gitRemote" | null>(null);
@@ -77,11 +62,7 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
   const [changelog, setChangelog] = useState<{ version: string; date: string; changes: string[] }[]>([]);
 
   useEffect(() => {
-    invoke<DesktopSettings>("get_settings").then(setSettings).catch(console.error);
     invoke<string>("get_branch").then((b) => { setBranch(b); setBranchInput(b); }).catch(console.error);
-    invoke<boolean>("get_claude_integration_status").then(setClaudeEnabled).catch(console.error);
-    invoke<boolean>("get_cursor_integration_status").then(setCursorEnabled).catch(console.error);
-    invoke<AppMeta>("get_app_meta").then(setAppMeta).catch(console.error);
   }, []);
 
   const openChangelog = async () => {
@@ -96,7 +77,7 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
     if (!settings) return;
     try {
       await invoke<string>("set_autostart", { enabled: !settings.autostart });
-      setSettings({ ...settings, autostart: !settings.autostart });
+      refreshSettings();
     } catch (e) { console.error(e); }
   };
 
@@ -104,7 +85,7 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
     if (!settings) return;
     try {
       await invoke<string>("set_clipboard_autostart", { enabled: !settings.clipboard_autostart });
-      setSettings({ ...settings, clipboard_autostart: !settings.clipboard_autostart });
+      refreshSettings();
     } catch (e) { console.error(e); }
   };
 
@@ -112,13 +93,12 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
     try {
       if (claudeEnabled) {
         await invoke<string>("remove_claude_integration");
-        setClaudeEnabled(false);
         showToast("Claude integration disabled");
       } else {
         await invoke<string>("setup_claude_integration");
-        setClaudeEnabled(true);
         showToast("Claude integration enabled");
       }
+      refreshIntegrationStatus();
     } catch (e) {
       showToast(`Error: ${e}`, true);
     }
@@ -128,13 +108,12 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
     try {
       if (cursorEnabled) {
         await invoke<string>("remove_cursor_integration");
-        setCursorEnabled(false);
         showToast("Cursor integration disabled");
       } else {
         await invoke<string>("setup_cursor_integration", { lang: locale });
-        setCursorEnabled(true);
         showToast("Cursor integration enabled");
       }
+      refreshIntegrationStatus();
     } catch (e) {
       showToast(`Error: ${e}`, true);
     }
@@ -227,7 +206,7 @@ export default function SettingsPage({ theme, onToggleTheme }: SettingsPageProps
                 </p>
               </div>
             </div>
-            <Toggle enabled={theme === "dark"} onToggle={onToggleTheme} />
+            <Toggle enabled={theme === "dark"} onToggle={toggleTheme} />
           </div>
 
           <div style={{ borderTop: "1px solid var(--border)" }} />

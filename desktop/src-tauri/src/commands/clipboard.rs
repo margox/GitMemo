@@ -316,7 +316,7 @@ pub(crate) mod desktop_poll {
                 let (ref mut last_text_hash, _) = *guard;
                 let mut clipboard = match arboard::Clipboard::new() {
                     Ok(cb) => cb,
-                    Err(e) => { log::error!("Failed to init clipboard: {}", e); return; }
+                    Err(e) => { log::error!("Failed to init clipboard: {}", e); WATCHING.store(false, Ordering::SeqCst); return; }
                 };
                 if let Ok(t) = clipboard.get_text() {
                     if !t.is_empty() { *last_text_hash = content_hash(&t); }

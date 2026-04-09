@@ -5,6 +5,7 @@ import { Notifications } from "@mantine/notifications";
 import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { initSyncListeners } from "./hooks/useSync";
+import { initAppListeners } from "./hooks/useAppStore";
 import "@mantine/core/styles.css";
 import "@mantine/notifications/styles.css";
 import "./index.css";
@@ -19,6 +20,7 @@ window.addEventListener("unhandledrejection", (e) => {
 
 // Initialize zustand store side effects (event listeners, initial data load)
 initSyncListeners();
+initAppListeners();
 
 const theme = createTheme({
   primaryColor: "blue",

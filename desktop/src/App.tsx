@@ -17,9 +17,10 @@ import ClaudeConfigPage from "./pages/ClaudeConfigPage";
 import { SetupWizard } from "./components/SetupWizard";
 import { useSync } from "./hooks/useSync";
 import { usePlatform } from "./hooks/usePlatform";
+import { useAppStore } from "./hooks/useAppStore";
 
 export type Page = "dashboard" | "conversations" | "notes" | "clipboard" | "search" | "plans" | "claude-config" | "settings";
-export type Theme = "dark" | "light";
+export type { Theme } from "./hooks/useAppStore";
 
 const pageOrder: Page[] = ["dashboard", "search", "conversations", "notes", "clipboard", "plans", "claude-config", "settings"];
 
@@ -35,13 +36,7 @@ function App() {
   const [initialized, setInitialized] = useState<boolean | null>(null);
   const sync = useSync();
   const { gitStatus } = sync;
-  const [theme, setTheme] = useState<Theme>(() => {
-    const saved = localStorage.getItem("gitmemo-theme") as Theme | null;
-    if (saved) return saved;
-    // Detect system preference on first launch
-    if (window.matchMedia?.("(prefers-color-scheme: light)").matches) return "light";
-    return "dark";
-  });
+  const { theme, toggleTheme } = useAppStore();
 
   // Lazy-mount: track visited pages so they stay mounted once opened
   useEffect(() => {
@@ -63,19 +58,7 @@ function App() {
     }
   }, [gitStatus]);
 
-  const toggleTheme = useCallback(() => {
-    setTheme((t) => {
-      const next = t === "dark" ? "light" : "dark";
-      localStorage.setItem("gitmemo-theme", next);
-      return next;
-    });
-  }, []);
-
   const focusSidebar = useCallback(() => setSidebarFocused(true), []);
-
-  useEffect(() => {
-    document.documentElement.setAttribute("data-theme", theme);
-  }, [theme]);
 
   // Intercept link clicks to open in external browser
   useEffect(() => {
@@ -188,7 +171,7 @@ function App() {
       {visitedPages.has("plans") && <div style={{ display: currentPage === "plans" ? "contents" : "none" }}><PlansPage onFocusSidebar={focusSidebar} enterTrigger={enterContentTrigger} /></div>}
       {visitedPages.has("claude-config") && <div style={{ display: currentPage === "claude-config" ? "contents" : "none" }}><ClaudeConfigPage onFocusSidebar={focusSidebar} enterTrigger={enterContentTrigger} /></div>}
       {visitedPages.has("search") && <div style={{ display: currentPage === "search" ? "contents" : "none" }}><SearchPage focusTrigger={focusTrigger} openFilePath={openFilePath} onFileOpened={() => setOpenFilePath(null)} /></div>}
-      {visitedPages.has("settings") && <div style={{ display: currentPage === "settings" ? "contents" : "none" }}><SettingsPage theme={theme} onToggleTheme={toggleTheme} /></div>}
+      {visitedPages.has("settings") && <div style={{ display: currentPage === "settings" ? "contents" : "none" }}><SettingsPage /></div>}
     </>
   );
 

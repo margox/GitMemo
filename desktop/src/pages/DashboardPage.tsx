@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { useI18n } from "../hooks/useI18n";
 import { useSync } from "../hooks/useSync";
+import { useAppStore } from "../hooks/useAppStore";
 import { relativeTime, formatAbsoluteTime } from "../utils/time";
 import { Loading } from "../components/Loading";
 import { useRelativeTimeTick } from "../hooks/useRelativeTimeTick";
@@ -21,12 +22,6 @@ interface AppStats {
   clips: number;
   plans: number;
   total_size_kb: number;
-}
-
-interface ClipboardStatus {
-  watching: boolean;
-  clips_count: number;
-  clips_dir: string;
 }
 
 interface RecentItem {
@@ -52,7 +47,6 @@ const DASHBOARD_CACHE_KEY = "gitmemo-dashboard-cache";
 
 interface DashboardCache {
   stats: AppStats | null;
-  clipStatus: ClipboardStatus | null;
   recent: RecentItem[];
 }
 
@@ -71,32 +65,29 @@ function saveCache(c: DashboardCache) {
 export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page) => void }) {
   const { t } = useI18n();
   const { isSuccess, isFailed, gitStatus } = useSync();
+  const { clipboardStatus: clipStatus, claudeEnabled, cursorEnabled } = useAppStore();
   useRelativeTimeTick();
 
   const cached = loadCache();
   const [stats, setStats] = useState<AppStats | null>(cached?.stats ?? null);
-  const [clipStatus, setClipStatus] = useState<ClipboardStatus | null>(cached?.clipStatus ?? null);
   const [recent, setRecent] = useState<RecentItem[]>(cached?.recent ?? []);
   const [error, setError] = useState("");
   const [reviewItem, setReviewItem] = useState<RecentItem | null>(null);
   const [reviewPreview, setReviewPreview] = useState("");
-  const [editorConfigured, setEditorConfigured] = useState(false);
+
+  // Derived state
+  const editorConfigured = claudeEnabled || cursorEnabled;
 
   // Load content stats only (no git status — that comes from global useSync)
   const loadData = useCallback(async () => {
     try {
-      const [s, cs, r, claude, cursor] = await Promise.all([
+      const [s, r] = await Promise.all([
         invoke<AppStats>("get_stats"),
-        invoke<ClipboardStatus>("get_clipboard_status").catch(() => null),
         invoke<RecentItem[]>("get_recent_activity").catch(() => []),
-        invoke<boolean>("get_claude_integration_status").catch(() => false),
-        invoke<boolean>("get_cursor_integration_status").catch(() => false),
       ]);
       setStats(s);
-      setClipStatus(cs);
       setRecent(r);
-      setEditorConfigured(claude || cursor);
-      saveCache({ stats: s, clipStatus: cs, recent: r });
+      saveCache({ stats: s, recent: r });
       // Load review item
       invoke<RecentItem | null>("get_review_item").then(item => {
         setReviewItem(item);
@@ -109,11 +100,6 @@ export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page
             .catch(() => {});
         }
       }).catch(() => {});
-      // Check editor integration status
-      Promise.all([
-        invoke<boolean>("get_claude_integration_status").catch(() => false),
-        invoke<boolean>("get_cursor_integration_status").catch(() => false),
-      ]).then(([claude, cursor]) => setEditorConfigured(claude || cursor)).catch(() => {});
     } catch (e) {
       setError(`${e}`);
     }
@@ -130,13 +116,6 @@ export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page
     }
   }, [isSuccess, isFailed, loadData]);
   useFileWatcher(["conversations", "notes", "clips", "plans"], loadData);
-
-  // Refresh clipboard status when toggled from ClipboardPage
-  useEffect(() => {
-    const handler = () => loadData();
-    window.addEventListener("clipboard-status-changed", handler);
-    return () => window.removeEventListener("clipboard-status-changed", handler);
-  }, [loadData]);
 
   if (error) {
     return (
