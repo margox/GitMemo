@@ -1,4 +1,4 @@
-import { MessageSquare, FileText, ClipboardList, FolderInput, Brain, Wrench, Target, BarChart3 } from 'lucide-react'
+import { MessageSquare, FileText, ClipboardList, Brain, Wrench, Target, BarChart3 } from 'lucide-react'
 import FadeIn from '../components/FadeIn'
 import { useI18n } from '../i18n'
 
@@ -11,7 +11,6 @@ export default function WhatGetsCaptured() {
     { icon: <BarChart3 size={18} />, typeKey: 'capture.research', descKey: 'capture.research.desc', dir: 'notes/manual/', color: '#ec4899' },
     { icon: <FileText size={18} />, typeKey: 'capture.design', descKey: 'capture.design.desc', dir: 'notes/manual/', color: '#f59e0b' },
     { icon: <ClipboardList size={18} />, typeKey: 'capture.clipboard', descKey: 'capture.clipboard.desc', dir: 'clips/', color: '#30d158' },
-    { icon: <FolderInput size={18} />, typeKey: 'capture.imports', descKey: 'capture.imports.desc', dir: 'imports/', color: '#14b8a6' },
     { icon: <Brain size={18} />, typeKey: 'capture.memory', descKey: 'capture.memory.desc', dir: 'claude-config/memory/', color: '#f97316' },
     { icon: <Wrench size={18} />, typeKey: 'capture.skills', descKey: 'capture.skills.desc', dir: 'claude-config/skills/', color: '#64748b' },
   ]
