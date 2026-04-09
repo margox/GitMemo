@@ -33,7 +33,7 @@ export default function DesktopApp() {
         </div>
 
         <div className="relative rounded-xl overflow-hidden border border-border bg-surface">
-          <img src={screenshot} alt="GitMemo Desktop" className="w-full" />
+          <img src={screenshot} alt="GitMemo Desktop" className="w-full rounded-xl" />
         </div>
       </div>
     </section>
