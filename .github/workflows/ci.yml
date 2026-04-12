@@ -197,13 +197,6 @@ jobs:
       - name: List artifacts
         run: find artifacts -type f | head -50
 
-      - name: Create tag
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag ${{ needs.check-version.outputs.version }}
-          git push origin ${{ needs.check-version.outputs.version }}
-
       - name: Collect desktop binaries
         run: |
           mkdir -p release-assets
@@ -242,7 +235,19 @@ jobs:
       - name: Generate latest.json for updater
         env:
           VERSION_TAG: ${{ needs.check-version.outputs.version }}
-        run: python3 scripts/write_latest_json.py
+        run: |
+          if [ -f release-assets/GitMemo-desktop-macos-aarch64.app.tar.gz.sig ] && [ -f release-assets/GitMemo-desktop-macos-x86_64.app.tar.gz.sig ]; then
+            python3 scripts/write_latest_json.py
+          else
+            echo "::warning::Skipping latest.json because updater signatures are missing; release will continue without desktop auto-update metadata."
+          fi
+
+      - name: Create tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag ${{ needs.check-version.outputs.version }}
+          git push origin ${{ needs.check-version.outputs.version }}
 
       - name: Create Release
         run: |
