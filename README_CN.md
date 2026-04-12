@@ -107,6 +107,7 @@ gitmemo init --path /path/to/your/repo
 - **系统通知**：通过 macOS 通知中心推送同步错误和剪贴板捕获（仅后台）
 - **Quick Paste**：浮窗命令面板（Cmd+Shift+Space）
 - **系统托盘**：快捷操作（打开/同步/剪贴板/退出）
+- **诊断日志**：与「检查更新」相关的条目带 `[updater]` 前缀，写入应用日志文件 `gitmemo.log`（macOS 一般在 `~/Library/Logs/` 下与应用相关的目录中；也可用「控制台」搜索 GitMemo）
 - Claude Code 和 Cursor 生成的 plans 都会导入到 `plans/`
 - 当前桌面端安装包仅支持 **macOS**（Apple Silicon + Intel）
 - Desktop 日常使用不必开着终端；**初始化可在应用内完成**，也可用 CLI 执行 `gitmemo init`。CLI 还便于在终端里用 `gitmemo note`、`sync` 等命令

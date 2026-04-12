@@ -2,11 +2,12 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { Settings, Power, Clipboard, Sun, Moon, GitBranch, ExternalLink, Globe, FolderOpen, Globe2, Terminal, Code, Copy, Check, MessageCircle, ScrollText, X, Download } from "lucide-react";
+import { Settings, Power, Clipboard, Sun, Moon, GitBranch, ExternalLink, Globe, FolderOpen, Globe2, Terminal, Code, Copy, Check, MessageCircle, ScrollText, X, Download, RefreshCw } from "lucide-react";
 import { useSync } from "../hooks/useSync";
 import { useI18n, type Locale } from "../hooks/useI18n";
 import { useToast } from "../hooks/useToast";
 import { useAppStore } from "../hooks/useAppStore";
+import type { Page } from "../App";
 
 function Toggle({ enabled, onToggle }: { enabled: boolean; onToggle: () => void }) {
   return (
@@ -40,7 +41,7 @@ function Toggle({ enabled, onToggle }: { enabled: boolean; onToggle: () => void 
   );
 }
 
-export default function SettingsPage() {
+export default function SettingsPage({ onNavigate }: { onNavigate?: (page: Page) => void } = {}) {
   const { t, locale, setLocale } = useI18n();
   const { showToast } = useToast();
   const { gitStatus, refreshGitStatus } = useSync();
@@ -166,6 +167,14 @@ export default function SettingsPage() {
     }
   };
 
+  const handleRefresh = async () => {
+    await Promise.allSettled([
+      refreshGitStatus(),
+      refreshSettings(),
+      refreshIntegrationStatus(),
+    ]);
+  };
+
   const cardStyle = {
     background: "var(--bg-card)",
     border: "1px solid var(--border)",
@@ -188,7 +197,20 @@ export default function SettingsPage() {
     <div style={{ padding: "20px 32px 32px", overflowY: "auto", height: "100%" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 20 }}>
         <Settings size={20} style={{ color: "var(--text-secondary)" }} />
-        <h1 style={{ fontSize: 22, fontWeight: 700 }}>{t("settings.title")}</h1>
+        <h1 style={{ fontSize: 22, fontWeight: 700, flex: 1 }}>{t("settings.title")}</h1>
+        <button
+          type="button"
+          onClick={() => void handleRefresh()}
+          title={t("common.refresh")}
+          style={{
+            background: "none", border: "none", cursor: "pointer", padding: 6, borderRadius: 6,
+            color: "var(--text-secondary)", display: "flex", alignItems: "center",
+          }}
+          onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
+          onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-secondary)")}
+        >
+          <RefreshCw size={14} />
+        </button>
       </div>
 
       <div style={cardStyle}>
@@ -294,6 +316,29 @@ export default function SettingsPage() {
               </div>
             </div>
             <Toggle enabled={cursorEnabled} onToggle={toggleCursorIntegration} />
+          </div>
+
+          <div style={{ borderTop: "1px solid var(--border)" }} />
+
+          {/* Local editor dirs */}
+          <div style={rowStyle}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <FolderOpen size={15} style={{ color: "var(--text-secondary)" }} />
+              <div>
+                <p style={{ fontSize: 13, fontWeight: 500 }}>{t("settings.localDirs")}</p>
+                <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>{t("settings.localDirsDesc")}</p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => onNavigate?.("editor-home")}
+              style={{
+                padding: "4px 12px", borderRadius: 4, fontSize: 12, cursor: "pointer",
+                background: "var(--bg-hover)", border: "1px solid var(--border)", color: "var(--accent)",
+              }}
+            >
+              {t("settings.open")}
+            </button>
           </div>
 
           <div style={{ borderTop: "1px solid var(--border)" }} />

@@ -210,64 +210,39 @@ jobs:
           # CLI binaries
           cp artifacts/gitmemo-macos-aarch64/gitmemo-macos-aarch64 release-assets/ || true
           cp artifacts/gitmemo-macos-x86_64/gitmemo-macos-x86_64 release-assets/ || true
-          # Desktop binaries (flatten nested paths)
+          # Desktop: each matrix job produces GitMemo.app.tar.gz + .sig with the SAME basename — flattening
+          # with a single find would overwrite. Copy per artifact name with distinct release filenames.
+          copy_desktop_pair() {
+            local suffix="$1"
+            local dir="artifacts/gitmemo-desktop-${suffix}"
+            if [ ! -d "$dir" ]; then
+              echo "::warning::missing artifact dir $dir"
+              return 0
+            fi
+            local tar sig
+            tar=$(find "$dir" -type f -name "*.app.tar.gz" ! -name "*.sig" | head -1)
+            sig=$(find "$dir" -type f -name "*.app.tar.gz.sig" | head -1)
+            if [ -z "$tar" ] || [ ! -f "$tar" ]; then
+              echo "::warning::no .app.tar.gz under $dir"
+              return 0
+            fi
+            local out="GitMemo-desktop-${suffix}.app.tar.gz"
+            cp "$tar" "release-assets/${out}"
+            if [ -n "$sig" ] && [ -f "$sig" ]; then
+              cp "$sig" "release-assets/${out}.sig"
+            else
+              echo "::warning::no .app.tar.gz.sig next to bundle in $dir (updater needs TAURI_SIGNING_PRIVATE_KEY during build)"
+            fi
+          }
+          copy_desktop_pair "macos-aarch64"
+          copy_desktop_pair "macos-x86_64"
           find artifacts/gitmemo-desktop-* -name "*.dmg" -exec cp {} release-assets/ \; || true
-          find artifacts/gitmemo-desktop-* -name "*.app.tar.gz" -exec cp {} release-assets/ \; || true
-          find artifacts/gitmemo-desktop-* -name "*.sig" -exec cp {} release-assets/ \; || true
           ls -la release-assets/
 
       - name: Generate latest.json for updater
-        run: |
-          VERSION="${{ needs.check-version.outputs.version }}"
-          VERSION_NUM="${VERSION#v}"
-          REPO="sahadev/gitmemo"
-          BASE_URL="https://github.com/${REPO}/releases/download/${VERSION}"
-
-          # Read signatures
-          AARCH64_SIG=""
-          X86_64_SIG=""
-          if [ -f release-assets/gitmemo-desktop.app.tar.gz.sig ]; then
-            AARCH64_SIG=$(cat release-assets/gitmemo-desktop.app.tar.gz.sig)
-            X86_64_SIG="$AARCH64_SIG"
-          fi
-          # Try arch-specific sig files
-          for f in release-assets/*aarch64*.app.tar.gz.sig; do
-            [ -f "$f" ] && AARCH64_SIG=$(cat "$f")
-          done
-          for f in release-assets/*x86_64*.app.tar.gz.sig; do
-            [ -f "$f" ] && X86_64_SIG=$(cat "$f")
-          done
-
-          # Find tar.gz filenames
-          AARCH64_TAR=$(find release-assets -name "*aarch64*.app.tar.gz" -not -name "*.sig" | head -1 | xargs basename 2>/dev/null || true)
-          X86_64_TAR=$(find release-assets -name "*x86_64*.app.tar.gz" -not -name "*.sig" | head -1 | xargs basename 2>/dev/null || true)
-          # Fallback to generic name
-          if [ -z "$AARCH64_TAR" ]; then
-            AARCH64_TAR=$(find release-assets -name "*.app.tar.gz" -not -name "*.sig" | head -1 | xargs basename 2>/dev/null || true)
-          fi
-          if [ -z "$X86_64_TAR" ]; then
-            X86_64_TAR="$AARCH64_TAR"
-          fi
-
-          cat > release-assets/latest.json << EOF
-          {
-            "version": "${VERSION_NUM}",
-            "notes": "See release notes on GitHub",
-            "pub_date": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
-            "platforms": {
-              "darwin-aarch64": {
-                "signature": "${AARCH64_SIG}",
-                "url": "${BASE_URL}/${AARCH64_TAR}"
-              },
-              "darwin-x86_64": {
-                "signature": "${X86_64_SIG}",
-                "url": "${BASE_URL}/${X86_64_TAR}"
-              }
-            }
-          }
-          EOF
-          echo "Generated latest.json:"
-          cat release-assets/latest.json
+        env:
+          VERSION_TAG: ${{ needs.check-version.outputs.version }}
+        run: python3 scripts/write_latest_json.py
 
       - name: Create Release
         run: |

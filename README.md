@@ -105,6 +105,7 @@ After initialization, conversations, notes, and other sources flow into your syn
 - **System notifications** via macOS Notification Center (sync errors, clipboard captures)
 - **Quick Paste** floating window (Cmd+Shift+Space) for command palette access
 - **System tray** with quick actions (Open/Sync/Clipboard/Quit)
+- **Diagnostics**: update-check events are logged with the `[updater]` prefix to `gitmemo.log` (on macOS, under `~/Library/Logs/` in the app’s log folder; you can also search for GitMemo in Console)
 - Plans created by Claude Code and Cursor are both imported into `plans/`
 - Current desktop packages target **macOS only** (Apple Silicon + Intel)
 - You don’t need a terminal day-to-day; **first-time setup can finish inside the app**, or you can use the CLI to run `gitmemo init`. The CLI is also handy for `gitmemo note`, `sync`, and other commands

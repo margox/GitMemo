@@ -5,14 +5,16 @@ import { Link2, Check } from "lucide-react";
 import { useI18n } from "../hooks/useI18n";
 import { useToast } from "../hooks/useToast";
 
-export function CopyPathButton({ relPath }: { relPath: string }) {
+export function CopyPathButton({ relPath, absolutePath }: { relPath?: string; absolutePath?: string }) {
   const { t } = useI18n();
   const { showToast } = useToast();
   const [done, setDone] = useState(false);
 
   const onClick = async () => {
     try {
-      const abs = await invoke<string>("resolve_sync_path", { relPath });
+      const abs = absolutePath
+        ?? (relPath ? await invoke<string>("resolve_sync_path", { relPath }) : "");
+      if (!abs) throw new Error("No path");
       await writeText(abs);
       setDone(true);
       setTimeout(() => setDone(false), 1500);

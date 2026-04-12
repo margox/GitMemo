@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { invoke } from "@tauri-apps/api/core";
-import { Brain, Wrench, FileText, ChevronLeft, ScrollText } from "lucide-react";
+import { Brain, Wrench, FileText, ChevronLeft, ScrollText, BookOpen, RefreshCw } from "lucide-react";
 import { Loading } from "../components/Loading";
 import MarkdownView from "../components/MarkdownView";
 import { CopyPathButton } from "../components/CopyPathButton";
@@ -16,19 +16,22 @@ interface FileEntry {
   modified: string;
   size: number;
   preview: string;
+  modified_ts?: number;
 }
 
-type Tab = "memory" | "skills" | "config" | "rules";
+type Tab = "memory" | "knowledge" | "skills" | "config" | "rules";
 type Editor = "claude" | "cursor";
 
 const claudeTabs: { id: Tab; labelKey: string; folder: string; icon: typeof Brain }[] = [
   { id: "memory", labelKey: "claudeConfig.memory", folder: "claude-config/memory", icon: Brain },
+  { id: "knowledge", labelKey: "claudeConfig.knowledge", folder: "claude-config/root-docs", icon: BookOpen },
   { id: "skills", labelKey: "claudeConfig.skills", folder: "claude-config/skills", icon: Wrench },
   { id: "config", labelKey: "claudeConfig.config", folder: "claude-config", icon: FileText },
 ];
 
 const cursorTabs: { id: Tab; labelKey: string; folder: string; icon: typeof Brain }[] = [
   { id: "rules", labelKey: "claudeConfig.rules", folder: "cursor-config/rules", icon: ScrollText },
+  { id: "knowledge", labelKey: "claudeConfig.knowledge", folder: "cursor-config/root-docs", icon: BookOpen },
   { id: "skills", labelKey: "claudeConfig.skills", folder: "cursor-config/skills", icon: Wrench },
   { id: "config", labelKey: "claudeConfig.config", folder: "cursor-config", icon: FileText },
 ];
@@ -52,17 +55,47 @@ export default function ClaudeConfigPage({ onFocusSidebar: _onFocusSidebar, ente
     if (!tabDef) return;
     setLoading(true);
     try {
-      let allFiles = await invoke<FileEntry[]>("list_files", { folder: tabDef.folder });
+      let allFiles: FileEntry[];
+      // Claude global memory + per-project memory (synced to claude-config/projects/*/memory/)
+      if (editor === "claude" && tab === "memory") {
+        const [globalMem, projectsTree] = await Promise.all([
+          invoke<FileEntry[]>("list_files", { folder: "claude-config/memory" }),
+          invoke<FileEntry[]>("list_files", { folder: "claude-config/projects" }),
+        ]);
+        const projectMemory = projectsTree.filter(
+          (f) => f.path.includes("/memory/") && f.path.endsWith(".md"),
+        );
+        allFiles = [...globalMem, ...projectMemory].sort(
+          (a, b) => (b.modified_ts ?? 0) - (a.modified_ts ?? 0),
+        );
+      } else if (tab === "knowledge") {
+        const base = editor === "claude" ? "claude-config" : "cursor-config";
+        const [rootDocs, projectsTree] = await Promise.all([
+          invoke<FileEntry[]>("list_files", { folder: `${base}/root-docs` }),
+          invoke<FileEntry[]>("list_files", { folder: `${base}/projects` }),
+        ]);
+        const projectKnowledge = projectsTree.filter((f) =>
+          (f.path.includes("/docs/") || f.path.includes("/references/") || f.path.includes("/specs/")) &&
+          f.path.endsWith(".md"),
+        );
+        allFiles = [...rootDocs, ...projectKnowledge].sort(
+          (a, b) => (b.modified_ts ?? 0) - (a.modified_ts ?? 0),
+        );
+      } else {
+        allFiles = await invoke<FileEntry[]>("list_files", { folder: tabDef.folder });
+      }
       // For "config" tab, only show root-level files, exclude subdirs
       if (tab === "config") {
         if (editor === "claude") {
           allFiles = allFiles.filter((f) =>
             !f.path.includes("claude-config/memory/") &&
+            !f.path.includes("claude-config/root-docs/") &&
             !f.path.includes("claude-config/skills/") &&
             !f.path.includes("claude-config/projects/")
           );
         } else {
           allFiles = allFiles.filter((f) =>
+            !f.path.includes("cursor-config/root-docs/") &&
             !f.path.includes("cursor-config/rules/") &&
             !f.path.includes("cursor-config/skills/")
           );
@@ -95,6 +128,11 @@ export default function ClaudeConfigPage({ onFocusSidebar: _onFocusSidebar, ente
       setTimeout(() => itemRefs.current.get(path)?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 50);
     } catch (e) { console.error(e); }
   };
+
+  const handleRefresh = useCallback(() => {
+    void loadFiles(activeTab);
+    if (selectedFile) void openFile(selectedFile);
+  }, [loadFiles, activeTab, selectedFile]);
 
   const navPrev = useCallback(() => {
     if (!selectedFile || files.length === 0) return;
@@ -134,6 +172,19 @@ export default function ClaudeConfigPage({ onFocusSidebar: _onFocusSidebar, ente
         }}>
           <Brain size={18} style={{ color: "var(--accent)" }} />
           <span style={{ fontSize: 15, fontWeight: 700, flex: 1 }}>{t("nav.claudeConfig")}</span>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            title={t("common.refresh")}
+            style={{
+              background: "none", border: "none", cursor: "pointer", padding: 4, borderRadius: 4,
+              color: "var(--text-secondary)", display: "flex", alignItems: "center",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-secondary)")}
+          >
+            <RefreshCw size={14} />
+          </button>
           <span style={{
             fontSize: 11, color: "var(--text-secondary)", background: "var(--bg-hover)",
             padding: "2px 8px", borderRadius: 10,

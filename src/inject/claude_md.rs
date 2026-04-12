@@ -19,7 +19,23 @@ fn generate_instruction_zh(sync_dir: &str) -> String {
 
 对话会由 GitMemo 自动捕获（通过 `gitmemo capture`），无需手动保存。
 
-当你生成**独立的、��长期参考价值的文档**时（调研报告、技术方案、教程指南、总结分析，或用户明确要求写文档/报告），自动保存到 `{sync_dir}/notes/manual/{{标题}}.md`：
+当你输出**大段、可独立阅读、对后续有复用价值**的内容时，必须将其转存为 Markdown 文档并保存到 GitMemo，而不是只留在聊天里。典型场景包括：调研报告、分析报告、技术方案、架构设计、教程指南、总结性长文，或用户明确要求写文档/报告。
+
+保存位置：`{sync_dir}/notes/manual/{{标题}}.md`
+
+这条规则的核心是：**大段内容要落盘，简单问答不要落盘。**
+
+触发：
+- 调研 / 竞品 / 技术分析形成了成篇结论
+- 输出了较长的方案、设计、教程、复盘、分析
+- 用户要求“写文档 / 报告 / 分析 / 方案”
+
+不触发：
+- 普通问答
+- 简短确认
+- 纯代码修改 / 调试过程中的零碎交流
+
+保存格式示例：
 
 ```markdown
 ---
@@ -31,7 +47,7 @@ tags: {{逗号分隔的标签}}
 {{文档正文}}
 ```
 
-规则：标题不超过 30 字，静默保存，同名文件覆盖。普通问答、代码修改、调试不触发。
+规则：标题不超过 30 字，静默保存，同名文件覆盖；正文尽量完整，不要只在对话里说“见上文”；保存后应继续按 GitMemo 规则同步。普通问答、代码修改、调试不触发。
 {MARKER_END}"#
     )
 }
@@ -43,7 +59,23 @@ fn generate_instruction_en(sync_dir: &str) -> String {
 
 Conversations are auto-captured by GitMemo (via `gitmemo capture`). No manual saving needed.
 
-When you generate **standalone, reference-worthy documents** (research reports, design docs, tutorials, analyses, or when the user explicitly asks to write a document/report), auto-save to `{sync_dir}/notes/manual/{{title}}.md`:
+When your answer contains **long-form, self-contained, reusable content**, you MUST convert it into a Markdown document and save it to GitMemo instead of leaving it only in chat. Typical cases: research reports, analysis reports, technical proposals, architecture docs, tutorials, long-form summaries, or whenever the user explicitly asks for a document/report.
+
+Save location: `{sync_dir}/notes/manual/{{title}}.md`
+
+Core rule: **long-form content should be saved as Markdown; simple Q&A should not.**
+
+Trigger:
+- Research / analysis with a substantial conclusion
+- A long proposal, design note, tutorial, postmortem, or report-like answer
+- The user asks to write a document / report / analysis / proposal
+
+Do not trigger:
+- Regular Q&A
+- Brief confirmations
+- Fragmented discussion during code edits / debugging
+
+Example format:
 
 ```markdown
 ---
@@ -55,7 +87,7 @@ tags: {{comma-separated tags}}
 {{document body}}
 ```
 
-Rules: title max 60 chars, save silently, overwrite same-name files. Do not trigger for regular Q&A, code edits, or debugging.
+Rules: title max 60 chars, save silently, overwrite same-name files; capture the full substance in the document instead of only referencing the chat; after saving, continue following GitMemo sync rules. Do not trigger for regular Q&A, code edits, or debugging.
 {MARKER_END}"#
     )
 }

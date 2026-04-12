@@ -7,7 +7,17 @@
     "clipboard": "Clipboard",
     "plans": "Plans",
     "claudeConfig": "AI Config",
+    "editorHome": "Local dirs",
     "settings": "Settings"
+  },
+  "editorHome": {
+    "title": "Local Claude & Cursor",
+    "subtitle": "Read-only browse of ~/.claude and ~/.cursor. Does not modify files or the GitMemo sync directory.",
+    "up": "Up",
+    "selectFile": "Pick a file on the left to preview",
+    "emptyDir": "This folder is empty",
+    "missingDir": "This directory does not exist yet (install or run the tool once).",
+    "missingBoth": "Neither ~/.claude nor ~/.cursor was found."
   },
   "sidebar": {
     "syncing": "Syncing...",
@@ -25,6 +35,7 @@
     "branch": "Branch",
     "syncStatus": "Sync Status",
     "lastCommit": "Last Commit",
+    "openCommitPage": "Open this commit on the remote host",
     "synced": "Synced",
     "unpushed": "unpushed",
     "behind": "{0} behind remote",
@@ -143,6 +154,9 @@
     "claudeIntegrationDesc": "Auto-save conversations & sync plans via CLAUDE.md",
     "cursorIntegration": "Cursor IDE integration",
     "cursorIntegrationDesc": "Auto-save conversations & inject rules via ~/.cursor/",
+    "localDirs": "Local Claude / Cursor dirs",
+    "localDirsDesc": "Read-only browse of the raw local folders for archive/debug checks",
+    "open": "Open",
     "shortcuts": "Keyboard shortcuts",
     "shortcutSearch": "Cmd/Ctrl+K: Open search",
     "shortcutGlobalSearch": "Cmd+Shift+G: Show GitMemo and focus search",
@@ -203,7 +217,8 @@
     "rules": "Rules",
     "empty": "No files yet",
     "emptyHint": "Click 'Sync to Git' to sync config",
-    "selectToView": "Select a file to view"
+    "selectToView": "Select a file to view",
+    "knowledge": "Knowledge"
   },
   "privacy": {
     "title": "Clipboard Privacy",

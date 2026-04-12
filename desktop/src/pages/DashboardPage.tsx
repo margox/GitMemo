@@ -1,5 +1,6 @@
-import { useEffect, useState, useCallback } from "react";
+import { useEffect, useState, useCallback, useMemo } from "react";
 import { invoke } from "@tauri-apps/api/core";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { useI18n } from "../hooks/useI18n";
 import { useSync } from "../hooks/useSync";
 import { useAppStore } from "../hooks/useAppStore";
@@ -33,6 +34,7 @@ interface RecentItem {
 }
 
 import type { Page } from "../App";
+import { commitBrowseUrl } from "../utils/gitRemoteWeb";
 
 const categoryConfig: Record<string, { icon: typeof MessageSquare; color: string; page: Page }> = {
   conversation: { icon: MessageSquare, color: "var(--accent)", page: "conversations" },
@@ -62,9 +64,9 @@ function saveCache(c: DashboardCache) {
   try { sessionStorage.setItem(DASHBOARD_CACHE_KEY, JSON.stringify(c)); } catch {}
 }
 
-export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page) => void }) {
+export default function DashboardPage({ onNavigate, active = false }: { onNavigate?: (page: Page) => void; active?: boolean }) {
   const { t } = useI18n();
-  const { isSuccess, isFailed, gitStatus } = useSync();
+  const { isSuccess, isFailed, gitStatus, refreshGitStatus } = useSync();
   const { clipboardStatus: clipStatus, claudeEnabled, cursorEnabled } = useAppStore();
   useRelativeTimeTick();
 
@@ -77,6 +79,10 @@ export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page
 
   // Derived state
   const editorConfigured = claudeEnabled || cursorEnabled;
+  const lastCommitBrowseUrl = useMemo(
+    () => commitBrowseUrl(gitStatus?.git_remote, gitStatus?.last_commit_id),
+    [gitStatus?.git_remote, gitStatus?.last_commit_id],
+  );
 
   // Load content stats only (no git status — that comes from global useSync)
   const loadData = useCallback(async () => {
@@ -109,6 +115,12 @@ export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page
     loadData();
   }, [loadData]);
 
+  useEffect(() => {
+    if (!active) return;
+    loadData();
+    void refreshGitStatus();
+  }, [active, loadData, refreshGitStatus]);
+
   // Refresh content stats when sync completes (state-driven)
   useEffect(() => {
     if (isSuccess || isFailed) {
@@ -116,6 +128,11 @@ export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page
     }
   }, [isSuccess, isFailed, loadData]);
   useFileWatcher(["conversations", "notes", "clips", "plans"], loadData);
+
+  const handleRefresh = useCallback(() => {
+    loadData();
+    void refreshGitStatus();
+  }, [loadData, refreshGitStatus]);
 
   if (error) {
     return (
@@ -181,26 +198,41 @@ export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page
     <div style={{ padding: "20px 28px 28px", overflowY: "auto", height: "100%" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
         <h1 style={{ fontSize: 20, fontWeight: 700 }}>{t("dashboard.title")}</h1>
-        {clipStatus && (
-          <div style={{
-            display: "flex", alignItems: "center", gap: 6,
-            padding: "4px 12px", borderRadius: 20,
-            background: clipStatus.watching ? "var(--bg-success)" : "var(--bg-hover)",
-            cursor: "pointer",
-          }} onClick={() => onNavigate?.("clipboard")}>
-            <Circle
-              size={7}
-              fill={clipStatus.watching ? "var(--green)" : "var(--text-secondary)"}
-              style={{ color: clipStatus.watching ? "var(--green)" : "var(--text-secondary)" }}
-            />
-            <span style={{
-              fontSize: 11, fontWeight: 500,
-              color: clipStatus.watching ? "var(--green)" : "var(--text-secondary)",
-            }}>
-              {clipStatus.watching ? t("dashboard.clipboardActive") : t("dashboard.clipboardInactive")}
-            </span>
-          </div>
-        )}
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            title={t("common.refresh")}
+            style={{
+              background: "none", border: "none", cursor: "pointer", padding: 6, borderRadius: 6,
+              color: "var(--text-secondary)", display: "flex", alignItems: "center",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-secondary)")}
+          >
+            <RefreshCw size={14} />
+          </button>
+          {clipStatus && (
+            <div style={{
+              display: "flex", alignItems: "center", gap: 6,
+              padding: "4px 12px", borderRadius: 20,
+              background: clipStatus.watching ? "var(--bg-success)" : "var(--bg-hover)",
+              cursor: "pointer",
+            }} onClick={() => onNavigate?.("clipboard")}>
+              <Circle
+                size={7}
+                fill={clipStatus.watching ? "var(--green)" : "var(--text-secondary)"}
+                style={{ color: clipStatus.watching ? "var(--green)" : "var(--text-secondary)" }}
+              />
+              <span style={{
+                fontSize: 11, fontWeight: 500,
+                color: clipStatus.watching ? "var(--green)" : "var(--text-secondary)",
+              }}>
+                {clipStatus.watching ? t("dashboard.clipboardActive") : t("dashboard.clipboardInactive")}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Onboarding Checklist */}
@@ -277,9 +309,28 @@ export default function DashboardPage({ onNavigate }: { onNavigate?: (page: Page
             <GitCommit size={13} style={{ color: "var(--text-secondary)" }} />
             <span style={{ fontSize: 11, color: "var(--text-secondary)" }}>{t("dashboard.lastCommit")}</span>
           </div>
-          <p style={{ fontSize: 18, fontWeight: 700, fontFamily: "ui-monospace, monospace", color: "var(--accent)" }}>
-            {gitStatus?.last_commit_id || "—"}
-          </p>
+          {lastCommitBrowseUrl && gitStatus?.last_commit_id ? (
+            <button
+              type="button"
+              title={t("dashboard.openCommitPage")}
+              onClick={() => void openUrl(lastCommitBrowseUrl)}
+              style={{
+                display: "block", width: "100%", textAlign: "left", padding: 0, margin: 0,
+                fontSize: 18, fontWeight: 700, fontFamily: "ui-monospace, monospace",
+                color: "var(--accent)", background: "none", border: "none", cursor: "pointer",
+                textDecoration: "underline", textDecorationColor: "transparent",
+                transition: "text-decoration-color 0.15s",
+              }}
+              onMouseEnter={(e) => { e.currentTarget.style.textDecorationColor = "var(--accent)"; }}
+              onMouseLeave={(e) => { e.currentTarget.style.textDecorationColor = "transparent"; }}
+            >
+              {gitStatus.last_commit_id}
+            </button>
+          ) : (
+            <p style={{ fontSize: 18, fontWeight: 700, fontFamily: "ui-monospace, monospace", color: "var(--accent)" }}>
+              {gitStatus?.last_commit_id || "—"}
+            </p>
+          )}
           {gitStatus?.last_commit_time && (
             <p style={{ fontSize: 10, color: "var(--text-secondary)", marginTop: 6 }}>
               {formatAbsoluteTime(gitStatus?.last_commit_time || "")}

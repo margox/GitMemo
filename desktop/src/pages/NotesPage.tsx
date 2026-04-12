@@ -2,7 +2,7 @@ import { useState, useEffect, useRef, useCallback, type ClipboardEvent, type Dis
 import { invoke } from "@tauri-apps/api/core";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { Loading } from "../components/Loading";
-import { Plus, FileText, Calendar, BookOpen, Send, ChevronLeft, Pencil, Save, Trash2, X } from "lucide-react";
+import { Plus, FileText, Calendar, BookOpen, Send, ChevronLeft, Pencil, Save, Trash2, X, RefreshCw } from "lucide-react";
 import MarkdownView from "../components/MarkdownView";
 import { CopyPathButton } from "../components/CopyPathButton";
 import { useResizablePanel } from "../hooks/useResizablePanel";
@@ -153,6 +153,10 @@ export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSideba
     } catch (e) { console.error(e); }
     finally { setLoading(false); }
   };
+  const handleRefresh = useCallback(() => {
+    void loadFiles();
+    if (selectedFile) void openFile(selectedFile);
+  }, [selectedFile, activeTab, files]);
   useFileWatcher(["notes"], loadFiles);
 
   const openFile = async (path: string) => {
@@ -250,7 +254,7 @@ export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSideba
       }}>
         {/* Tabs */}
         <div style={{
-          display: "flex", borderBottom: "1px solid var(--border)",
+          display: "flex", alignItems: "center", borderBottom: "1px solid var(--border)",
           padding: "0 8px",
         }}>
           {tabs.map((tab) => {
@@ -275,6 +279,19 @@ export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSideba
               </button>
             );
           })}
+          <button
+            type="button"
+            onClick={handleRefresh}
+            title={t("common.refresh")}
+            style={{
+              background: "none", border: "none", cursor: "pointer", padding: 6, borderRadius: 4,
+              color: "var(--text-secondary)", display: "flex", alignItems: "center",
+            }}
+            onMouseEnter={(e) => (e.currentTarget.style.color = "var(--accent)")}
+            onMouseLeave={(e) => (e.currentTarget.style.color = "var(--text-secondary)")}
+          >
+            <RefreshCw size={14} />
+          </button>
         </div>
 
         {/* Quick note input */}

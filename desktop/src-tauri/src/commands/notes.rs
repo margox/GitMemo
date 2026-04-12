@@ -513,9 +513,22 @@ pub fn delete_plan(file_path: String, delete_source: Option<bool>) -> Result<Not
     std::fs::remove_file(&full_path).map_err(|e| e.to_string())?;
 
     if delete_source {
-        if let Some(name) = Path::new(&norm).file_name().map(|s| s.to_string_lossy().to_string()) {
-            if let Some(home) = std::env::var_os("HOME") {
-                for source_dir in external_plan_dirs(&PathBuf::from(home)) {
+        if let Some(home) = std::env::var_os("HOME") {
+            let home = PathBuf::from(home);
+            let rel_after_plans = norm.trim_start_matches("plans/");
+            let mut parts = rel_after_plans.splitn(2, '/');
+            let source = parts.next().unwrap_or_default();
+            let rest = parts.next().unwrap_or_default();
+
+            if let Some(source_dir) = external_plan_dir_for_source(&home, source) {
+                if !rest.is_empty() {
+                    let source_plan = source_dir.join(rest);
+                    if source_plan.is_file() {
+                        let _ = std::fs::remove_file(source_plan);
+                    }
+                }
+            } else if let Some(name) = Path::new(&norm).file_name().map(|s| s.to_string_lossy().to_string()) {
+                for source_dir in external_plan_dirs(&home) {
                     let source_plan = source_dir.join(&name);
                     if source_plan.is_file() {
                         let _ = std::fs::remove_file(source_plan);
@@ -646,6 +659,9 @@ pub(crate) fn sync_to_git_blocking() -> Result<String, String> {
     if !dir.exists() {
         return Err("GitMemo not initialized".into());
     }
+    sync_external_plans_to_gitmemo(&dir);
+    sync_claude_config(&dir);
+    sync_cursor_config(&dir);
     run_full_sync(&dir)
 }
 
@@ -654,6 +670,76 @@ fn external_plan_dirs(home: &Path) -> [PathBuf; 2] {
         home.join(".claude").join("plans"),
         home.join(".cursor").join("plans"),
     ]
+}
+
+fn external_plan_dir_for_source(home: &Path, source: &str) -> Option<PathBuf> {
+    match source {
+        "claude" => Some(home.join(".claude").join("plans")),
+        "cursor" => Some(home.join(".cursor").join("plans")),
+        _ => None,
+    }
+}
+
+fn sync_plan_dir_to_gitmemo(src: &Path, dst: &Path) {
+    if !src.is_dir() {
+        return;
+    }
+    for entry in walkdir::WalkDir::new(src)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        let path = entry.path();
+        if !path.is_file() || path.extension().and_then(|e| e.to_str()) != Some("md") {
+            continue;
+        }
+        let rel = path.strip_prefix(src).unwrap_or(path);
+        let out = dst.join(rel);
+        if let Some(parent) = out.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::copy(path, out);
+    }
+}
+
+/// Remove legacy flat files like `plans/foo.md` when the canonical copy now lives at
+/// `plans/claude/foo.md` or `plans/cursor/foo.md`.
+fn cleanup_legacy_flat_plans(plans_dst: &Path) {
+    let mut canonical_names = std::collections::HashSet::new();
+    for source in ["claude", "cursor"] {
+        let source_dir = plans_dst.join(source);
+        if !source_dir.is_dir() {
+            continue;
+        }
+        for entry in walkdir::WalkDir::new(&source_dir)
+            .into_iter()
+            .filter_map(|e| e.ok())
+        {
+            let path = entry.path();
+            if !path.is_file() || path.extension().and_then(|e| e.to_str()) != Some("md") {
+                continue;
+            }
+            if let Some(name) = path.file_name().and_then(|s| s.to_str()) {
+                canonical_names.insert(name.to_string());
+            }
+        }
+    }
+
+    if canonical_names.is_empty() {
+        return;
+    }
+
+    if let Ok(entries) = std::fs::read_dir(plans_dst) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if !path.is_file() || path.extension().and_then(|e| e.to_str()) != Some("md") {
+                continue;
+            }
+            let Some(name) = path.file_name().and_then(|s| s.to_str()) else { continue; };
+            if canonical_names.contains(name) {
+                let _ = std::fs::remove_file(path);
+            }
+        }
+    }
 }
 
 /// Copy editor-generated plan files into `<gitmemo>/plans/`.
@@ -665,24 +751,15 @@ pub fn sync_external_plans_to_gitmemo(dir: &std::path::Path) {
     let plans_dst = dir.join("plans");
     let _ = std::fs::create_dir_all(&plans_dst);
 
-    for plans_src in external_plan_dirs(&home) {
-        if !plans_src.is_dir() {
-            continue;
-        }
-        if let Ok(entries) = std::fs::read_dir(&plans_src) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.extension().map(|e| e == "md").unwrap_or(false) {
-                    let dest = plans_dst.join(path.file_name().unwrap());
-                    let _ = std::fs::copy(&path, &dest);
-                }
-            }
-        }
+    for (source, plans_src) in [("claude", home.join(".claude").join("plans")), ("cursor", home.join(".cursor").join("plans"))] {
+        sync_plan_dir_to_gitmemo(&plans_src, &plans_dst.join(source));
     }
+    cleanup_legacy_flat_plans(&plans_dst);
 }
 
 /// Sync valuable Claude config files to <gitmemo>/claude-config/
-/// Syncs: memory/ (global), projects/*/memory/ (per-project), skills/, CLAUDE.md
+/// Syncs: memory/ (global), projects/*/memory/ (per-project), skills/, CLAUDE.md,
+/// root docs, and project docs/references/specs.
 fn sync_claude_config(dir: &std::path::Path) {
     let home = match std::env::var("HOME").ok() {
         Some(h) => std::path::PathBuf::from(h),
@@ -708,6 +785,9 @@ fn sync_claude_config(dir: &std::path::Path) {
     // 3. Skills/
     copy_dir_recursive(&claude_dir.join("skills"), &dst_root.join("skills"));
 
+    // 3.5 Root-level user docs (exclude CLAUDE.md which is copied separately)
+    copy_root_markdown_files(&claude_dir, &dst_root.join("root-docs"), &["CLAUDE.md"]);
+
     // 4. Per-project memory/ (projects/*/memory/)
     let projects_dir = claude_dir.join("projects");
     if projects_dir.is_dir() {
@@ -723,10 +803,12 @@ fn sync_claude_config(dir: &std::path::Path) {
             }
         }
     }
+
+    copy_project_knowledge_dirs(&projects_dir, &dst_root.join("projects"));
 }
 
 /// Sync Cursor config files to <gitmemo>/cursor-config/
-/// Syncs: rules/*.mdc, skills/, mcp.json
+/// Syncs: rules/*.mdc, skills/, mcp.json, root docs and project docs/references/specs.
 fn sync_cursor_config(dir: &std::path::Path) {
     let home = match std::env::var("HOME").ok() {
         Some(h) => std::path::PathBuf::from(h),
@@ -759,6 +841,12 @@ fn sync_cursor_config(dir: &std::path::Path) {
     // 2. Skills/
     copy_dir_recursive(&cursor_dir.join("skills"), &dst_root.join("skills"));
 
+    // 2.5 Root-level user docs
+    copy_root_markdown_files(&cursor_dir, &dst_root.join("root-docs"), &[]);
+
+    // 2.6 Project long-term docs
+    copy_project_knowledge_dirs(&cursor_dir.join("projects"), &dst_root.join("projects"));
+
     // 3. mcp.json
     let mcp_json = cursor_dir.join("mcp.json");
     if mcp_json.exists() {
@@ -766,18 +854,66 @@ fn sync_cursor_config(dir: &std::path::Path) {
     }
 }
 
-/// Copy all .md files from src to dst (non-recursive)
+/// Copy all `.md` files under `src` into `dst`, preserving relative paths (recursive).
 fn copy_dir_md(src: &std::path::Path, dst: &std::path::Path) {
     if !src.is_dir() {
         return;
     }
-    let _ = std::fs::create_dir_all(dst);
-    if let Ok(entries) = std::fs::read_dir(src) {
+    for entry in walkdir::WalkDir::new(src)
+        .into_iter()
+        .filter_map(|e| e.ok())
+    {
+        let path = entry.path();
+        if !path.is_file() {
+            continue;
+        }
+        if path.extension().and_then(|e| e.to_str()) != Some("md") {
+            continue;
+        }
+        let rel = path.strip_prefix(src).unwrap_or(path);
+        let dest = dst.join(rel);
+        if let Some(parent) = dest.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        let _ = std::fs::copy(path, &dest);
+    }
+}
+
+fn copy_root_markdown_files(src_root: &Path, dst_root: &Path, exclude_names: &[&str]) {
+    if !src_root.is_dir() {
+        return;
+    }
+    let _ = std::fs::create_dir_all(dst_root);
+    if let Ok(entries) = std::fs::read_dir(src_root) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if path.extension().map(|e| e == "md").unwrap_or(false) {
-                let dest = dst.join(path.file_name().unwrap());
-                let _ = std::fs::copy(&path, &dest);
+            if !path.is_file() || path.extension().and_then(|e| e.to_str()) != Some("md") {
+                continue;
+            }
+            let Some(name) = path.file_name().and_then(|s| s.to_str()) else { continue; };
+            if exclude_names.iter().any(|x| *x == name) {
+                continue;
+            }
+            let _ = std::fs::copy(&path, dst_root.join(name));
+        }
+    }
+}
+
+fn copy_project_knowledge_dirs(projects_dir: &Path, dst_projects_root: &Path) {
+    const DOC_DIRS: &[&str] = &["docs", "references", "specs"];
+    if !projects_dir.is_dir() {
+        return;
+    }
+    if let Ok(entries) = std::fs::read_dir(projects_dir) {
+        for entry in entries.flatten() {
+            let proj_path = entry.path();
+            let Some(proj_name) = proj_path.file_name().map(|s| s.to_string_lossy().to_string()) else { continue; };
+            for doc_dir in DOC_DIRS {
+                let src = proj_path.join(doc_dir);
+                if src.is_dir() {
+                    let dst = dst_projects_root.join(&proj_name).join(doc_dir);
+                    copy_dir_md(&src, &dst);
+                }
             }
         }
     }

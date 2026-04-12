@@ -14,12 +14,13 @@ import SettingsPage from "./pages/SettingsPage";
 import ConversationsPage from "./pages/ConversationsPage";
 import PlansPage from "./pages/PlansPage";
 import ClaudeConfigPage from "./pages/ClaudeConfigPage";
+import EditorHomePage from "./pages/EditorHomePage";
 import { SetupWizard } from "./components/SetupWizard";
 import { useSync } from "./hooks/useSync";
 import { usePlatform } from "./hooks/usePlatform";
 import { useAppStore } from "./hooks/useAppStore";
 
-export type Page = "dashboard" | "conversations" | "notes" | "clipboard" | "search" | "plans" | "claude-config" | "settings";
+export type Page = "dashboard" | "conversations" | "notes" | "clipboard" | "search" | "plans" | "claude-config" | "editor-home" | "settings";
 export type { Theme } from "./hooks/useAppStore";
 
 const pageOrder: Page[] = ["dashboard", "search", "conversations", "notes", "clipboard", "plans", "claude-config", "settings"];
@@ -164,14 +165,15 @@ function App() {
     <SetupWizard onComplete={handleSetupComplete} />
   ) : (
     <>
-      {visitedPages.has("dashboard") && <div style={{ display: currentPage === "dashboard" ? "contents" : "none" }}><DashboardPage onNavigate={setCurrentPage} /></div>}
+      {visitedPages.has("dashboard") && <div style={{ display: currentPage === "dashboard" ? "contents" : "none" }}><DashboardPage onNavigate={setCurrentPage} active={currentPage === "dashboard"} /></div>}
       {visitedPages.has("conversations") && <div style={{ display: currentPage === "conversations" ? "contents" : "none" }}><ConversationsPage onFocusSidebar={focusSidebar} enterTrigger={enterContentTrigger} sidebarFocused={sidebarFocused} /></div>}
       {visitedPages.has("notes") && <div style={{ display: currentPage === "notes" ? "contents" : "none" }}><NotesPage focusTrigger={focusTrigger} onFocusSidebar={focusSidebar} enterTrigger={enterContentTrigger} /></div>}
       {visitedPages.has("clipboard") && <div style={{ display: currentPage === "clipboard" ? "contents" : "none" }}><ClipboardPage onFocusSidebar={focusSidebar} enterTrigger={enterContentTrigger} /></div>}
       {visitedPages.has("plans") && <div style={{ display: currentPage === "plans" ? "contents" : "none" }}><PlansPage onFocusSidebar={focusSidebar} enterTrigger={enterContentTrigger} /></div>}
       {visitedPages.has("claude-config") && <div style={{ display: currentPage === "claude-config" ? "contents" : "none" }}><ClaudeConfigPage onFocusSidebar={focusSidebar} enterTrigger={enterContentTrigger} /></div>}
+      {visitedPages.has("editor-home") && <div style={{ display: currentPage === "editor-home" ? "contents" : "none" }}><EditorHomePage /></div>}
       {visitedPages.has("search") && <div style={{ display: currentPage === "search" ? "contents" : "none" }}><SearchPage focusTrigger={focusTrigger} openFilePath={openFilePath} onFileOpened={() => setOpenFilePath(null)} /></div>}
-      {visitedPages.has("settings") && <div style={{ display: currentPage === "settings" ? "contents" : "none" }}><SettingsPage /></div>}
+      {visitedPages.has("settings") && <div style={{ display: currentPage === "settings" ? "contents" : "none" }}><SettingsPage onNavigate={setCurrentPage} /></div>}
     </>
   );
 

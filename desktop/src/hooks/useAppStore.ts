@@ -1,8 +1,47 @@
 import { create } from "zustand";
 import { listen } from "@tauri-apps/api/event";
 import { invoke } from "@tauri-apps/api/core";
-import { check, type Update } from "@tauri-apps/plugin-updater";
+import { error as logPluginError, info as logPluginInfo, warn as logPluginWarn } from "@tauri-apps/plugin-log";
+import { check } from "@tauri-apps/plugin-updater";
 import { relaunch } from "@tauri-apps/plugin-process";
+
+/** 检查更新请求超时（毫秒）。元数据从 GitHub 拉取，不设超时时弱网可能卡住数十秒。 */
+const UPDATE_CHECK_TIMEOUT_MS = 15_000;
+/** 下载安装包超时（毫秒），大文件在慢网下需要更长时间。 */
+const UPDATE_DOWNLOAD_TIMEOUT_MS = 600_000;
+
+function formatUnknownErr(e: unknown): string {
+  if (e instanceof Error) return `${e.name}: ${e.message}`;
+  return String(e);
+}
+
+/** 写入应用日志目录下的 `gitmemo.log`（与 Rust `tauri-plugin-log` 一致）；非 Tauri 环境回退到 console。 */
+async function logUpdaterInfo(message: string): Promise<void> {
+  const line = `[updater] ${message}`;
+  try {
+    await logPluginInfo(line);
+  } catch {
+    console.info(line);
+  }
+}
+
+async function logUpdaterWarn(message: string): Promise<void> {
+  const line = `[updater] ${message}`;
+  try {
+    await logPluginWarn(line);
+  } catch {
+    console.warn(line);
+  }
+}
+
+async function logUpdaterError(message: string): Promise<void> {
+  const line = `[updater] ${message}`;
+  try {
+    await logPluginError(line);
+  } catch {
+    console.error(line);
+  }
+}
 
 // ---- Shared types (single source of truth) ----
 
@@ -112,42 +151,61 @@ const useAppStoreInternal = create<AppStore>((set, get) => ({
 
   checkForUpdates: async () => {
     set({ updateStatus: "checking", updateProgress: 0, updateError: null });
+    const t0 = performance.now();
+    await logUpdaterInfo(
+      `check start (timeout_ms=${UPDATE_CHECK_TIMEOUT_MS}, endpoint=tauri.conf updater endpoints)`,
+    );
     try {
-      const update = await check();
-      if (update?.available) {
+      const update = await check({ timeout: UPDATE_CHECK_TIMEOUT_MS });
+      const ms = Math.round(performance.now() - t0);
+      if (update) {
+        await logUpdaterInfo(`check ok in ${ms}ms: available version=${update.version}`);
         set({ updateStatus: "available", updateVersion: update.version });
       } else {
+        await logUpdaterInfo(`check ok in ${ms}ms: already latest`);
         set({ updateStatus: "idle", updateVersion: null });
       }
     } catch (e) {
-      set({ updateStatus: "error", updateError: String(e) });
+      const ms = Math.round(performance.now() - t0);
+      const errStr = formatUnknownErr(e);
+      await logUpdaterError(`check failed after ${ms}ms: ${errStr}`);
+      set({ updateStatus: "error", updateError: errStr });
     }
   },
 
   installUpdate: async () => {
     set({ updateStatus: "downloading", updateProgress: 0 });
+    const t0 = performance.now();
+    await logUpdaterInfo(`install: re-check start (timeout_ms=${UPDATE_CHECK_TIMEOUT_MS})`);
     try {
-      const update = await check();
+      const update = await check({ timeout: UPDATE_CHECK_TIMEOUT_MS });
       if (!update?.available) {
+        await logUpdaterWarn(`install: re-check found no update after ${Math.round(performance.now() - t0)}ms, abort`);
         set({ updateStatus: "idle" });
         return;
       }
+      await logUpdaterInfo(`install: download+install start version=${update.version} (download_timeout_ms=${UPDATE_DOWNLOAD_TIMEOUT_MS})`);
       let downloaded = 0;
       let contentLength = 0;
       await update.downloadAndInstall((event) => {
         if (event.event === "Started") {
           contentLength = event.data.contentLength ?? 0;
+          void logUpdaterInfo(`install: download started content_length=${contentLength ?? "unknown"}`);
         } else if (event.event === "Progress") {
           downloaded += event.data.chunkLength;
           const pct = contentLength > 0 ? Math.round((downloaded / contentLength) * 100) : 0;
           set({ updateProgress: pct });
         } else if (event.event === "Finished") {
           set({ updateProgress: 100 });
+          void logUpdaterInfo("install: download finished, invoking install/relaunch");
         }
-      });
+      }, { timeout: UPDATE_DOWNLOAD_TIMEOUT_MS });
       await relaunch();
     } catch (e) {
-      set({ updateStatus: "error", updateError: String(e) });
+      const ms = Math.round(performance.now() - t0);
+      const errStr = formatUnknownErr(e);
+      await logUpdaterError(`install failed after ${ms}ms: ${errStr}`);
+      set({ updateStatus: "error", updateError: errStr });
     }
   },
 

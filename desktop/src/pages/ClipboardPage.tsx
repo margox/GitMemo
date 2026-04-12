@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
 import { ask } from "@tauri-apps/plugin-dialog";
 import { readText, writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { Clipboard, Play, Square, Save, Copy, Check, ChevronLeft, Trash2 } from "lucide-react";
+import { Clipboard, Play, Square, Save, Copy, Check, ChevronLeft, Trash2, RefreshCw } from "lucide-react";
 import MarkdownView from "../components/MarkdownView";
 import { Loading } from "../components/Loading";
 import { CopyPathButton } from "../components/CopyPathButton";
@@ -260,6 +260,13 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
             )}
           </div>
           <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <button onClick={() => { setRefreshTrigger((t) => t + 1); void refreshClipboardStatus(); if (selectedFile) void openFile(selectedFile); }} title={t("common.refresh")} style={{
+              display: "flex", alignItems: "center", padding: 6,
+              borderRadius: 4, cursor: "pointer",
+              background: "none", border: "none", color: "var(--text-secondary)",
+            }}>
+              <RefreshCw size={14} />
+            </button>
             <button onClick={saveNow} title={t("clipboard.saveCurrentClipboard")} style={{
               display: "flex", alignItems: "center", padding: 6,
               borderRadius: 4, cursor: "pointer",

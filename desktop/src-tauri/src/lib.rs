@@ -1,6 +1,6 @@
 mod commands;
 
-use commands::{clipboard, crash_log, import, init, notes, search, settings, stats, watcher};
+use commands::{clipboard, crash_log, import, init, local_editor, notes, search, settings, stats, watcher};
 use tauri::{Emitter, Listener};
 
 #[cfg(desktop)]
@@ -88,6 +88,10 @@ pub fn run() {
             settings::set_branch,
             settings::set_remote,
             settings::test_remote_sync,
+            local_editor::get_editor_data_roots,
+            local_editor::list_editor_directory,
+            local_editor::read_editor_home_file,
+            local_editor::resolve_editor_file_abs,
             settings::get_ssh_public_key,
             settings::get_claude_integration_status,
             settings::setup_claude_integration,
