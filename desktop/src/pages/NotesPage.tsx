@@ -12,6 +12,7 @@ import { relativeTime } from "../utils/time";
 import { useI18n } from "../hooks/useI18n";
 import { useToast } from "../hooks/useToast";
 import { useFileWatcher } from "../hooks/useFileWatcher";
+import { useAppStore, type NotesTab } from "../hooks/useAppStore";
 
 interface FileEntry {
   name: string;
@@ -34,9 +35,7 @@ interface SavedAttachment {
   message: string;
 }
 
-type NoteTab = "scratch" | "daily" | "manual";
-
-const tabs: { id: NoteTab; labelKey: string; icon: typeof FileText; folder: string }[] = [
+const tabs: { id: NotesTab; labelKey: string; icon: typeof FileText; folder: string }[] = [
   { id: "scratch", labelKey: "notes.scratch", icon: FileText, folder: "notes/scratch" },
   { id: "daily", labelKey: "notes.daily", icon: Calendar, folder: "notes/daily" },
   { id: "manual", labelKey: "notes.manual", icon: BookOpen, folder: "notes/manual" },
@@ -45,10 +44,10 @@ const tabs: { id: NoteTab; labelKey: string; icon: typeof FileText; folder: stri
 export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSidebar, enterTrigger: _enterTrigger }: { focusTrigger?: number; onFocusSidebar?: () => void; enterTrigger?: number }) {
   const { t } = useI18n();
   const { showToast } = useToast();
+  const { notesTab: activeTab, setNotesTab, pendingOpenPath, consumePendingOpenPath } = useAppStore();
   useRelativeTimeTick();
   const isMobile = usePlatform() === "mobile";
   const panel = useResizablePanel("notes", 300);
-  const [activeTab, setActiveTab] = useState<NoteTab>("scratch");
   const [files, setFiles] = useState<FileEntry[]>([]);
   const [selectedFile, setSelectedFile] = useState<string | null>(null);
   const [fileContent, setFileContent] = useState("");
@@ -143,6 +142,15 @@ export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSideba
   useEffect(() => {
     if (focusTrigger && textareaRef.current) textareaRef.current.focus();
   }, [focusTrigger]);
+
+  useEffect(() => {
+    if (!pendingOpenPath?.startsWith("notes/")) return;
+    if (pendingOpenPath.startsWith("notes/daily/")) setNotesTab("daily");
+    else if (pendingOpenPath.startsWith("notes/manual/")) setNotesTab("manual");
+    else setNotesTab("scratch");
+    void openFile(pendingOpenPath);
+    consumePendingOpenPath();
+  }, [pendingOpenPath, setNotesTab, consumePendingOpenPath]);
 
   const loadFiles = async () => {
     setLoading(true);
@@ -263,7 +271,7 @@ export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSideba
             return (
               <button
                 key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
+                onClick={() => setNotesTab(tab.id)}
                 style={{
                   flex: 1, display: "flex", alignItems: "center", justifyContent: "center",
                   gap: 4, padding: "12px 4px", fontSize: 11, cursor: "pointer",

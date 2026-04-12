@@ -3,7 +3,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { useI18n } from "../hooks/useI18n";
 import { useSync } from "../hooks/useSync";
-import { useAppStore } from "../hooks/useAppStore";
+import { useAppStore, type NotesTab } from "../hooks/useAppStore";
 import { relativeTime, formatAbsoluteTime } from "../utils/time";
 import { Loading } from "../components/Loading";
 import { useRelativeTimeTick } from "../hooks/useRelativeTimeTick";
@@ -36,11 +36,11 @@ interface RecentItem {
 import type { Page } from "../App";
 import { commitBrowseUrl } from "../utils/gitRemoteWeb";
 
-const categoryConfig: Record<string, { icon: typeof MessageSquare; color: string; page: Page }> = {
+const categoryConfig: Record<string, { icon: typeof MessageSquare; color: string; page: Page; notesTab?: NotesTab }> = {
   conversation: { icon: MessageSquare, color: "var(--accent)", page: "conversations" },
-  daily: { icon: StickyNote, color: "var(--green)", page: "notes" },
-  manual: { icon: BookOpen, color: "var(--yellow)", page: "notes" },
-  scratch: { icon: FileText, color: "var(--purple)", page: "notes" },
+  daily: { icon: StickyNote, color: "var(--green)", page: "notes", notesTab: "daily" },
+  manual: { icon: BookOpen, color: "var(--yellow)", page: "notes", notesTab: "manual" },
+  scratch: { icon: FileText, color: "var(--purple)", page: "notes", notesTab: "scratch" },
   clip: { icon: Clipboard, color: "var(--pink)", page: "clipboard" },
   plan: { icon: Lightbulb, color: "var(--yellow)", page: "plans" },
 };
@@ -67,8 +67,20 @@ function saveCache(c: DashboardCache) {
 export default function DashboardPage({ onNavigate, active = false }: { onNavigate?: (page: Page) => void; active?: boolean }) {
   const { t } = useI18n();
   const { isSuccess, isFailed, gitStatus, refreshGitStatus } = useSync();
-  const { clipboardStatus: clipStatus, claudeEnabled, cursorEnabled } = useAppStore();
+  const { clipboardStatus: clipStatus, claudeEnabled, cursorEnabled, setNotesTab, setPendingOpenPath } = useAppStore();
   useRelativeTimeTick();
+  const navigateTo = useCallback((page: Page, notesTab?: NotesTab) => {
+    if (page === "notes" && notesTab) setNotesTab(notesTab);
+    onNavigate?.(page);
+  }, [onNavigate, setNotesTab]);
+
+  const openRecord = useCallback((item: RecentItem) => {
+    const cfg = categoryConfig[item.category] || categoryConfig.scratch;
+    if (cfg.page === "notes" && cfg.notesTab) setNotesTab(cfg.notesTab);
+    setPendingOpenPath(item.path);
+    onNavigate?.(cfg.page);
+  }, [onNavigate, setNotesTab, setPendingOpenPath]);
+
 
   const cached = loadCache();
   const [stats, setStats] = useState<AppStats | null>(cached?.stats ?? null);
@@ -152,11 +164,11 @@ export default function DashboardPage({ onNavigate, active = false }: { onNaviga
     return <Loading text={t("dashboard.loading")} />;
   }
 
-  const statCards: { icon: typeof MessageSquare; label: string; value: number | string; color: string; page?: Page }[] = [
+  const statCards: { icon: typeof MessageSquare; label: string; value: number | string; color: string; page?: Page; notesTab?: NotesTab }[] = [
     { icon: MessageSquare, label: t("dashboard.conversations"), value: stats.conversations, color: "var(--accent)", page: "conversations" },
-    { icon: StickyNote, label: t("dashboard.dailyNotes"), value: stats.daily_notes, color: "var(--green)", page: "notes" },
-    { icon: BookOpen, label: t("dashboard.manuals"), value: stats.manuals, color: "var(--yellow)", page: "notes" },
-    { icon: FileText, label: t("dashboard.scratchNotes"), value: stats.scratch_notes, color: "var(--purple)", page: "notes" },
+    { icon: StickyNote, label: t("dashboard.dailyNotes"), value: stats.daily_notes, color: "var(--green)", page: "notes", notesTab: "daily" },
+    { icon: BookOpen, label: t("dashboard.manuals"), value: stats.manuals, color: "var(--yellow)", page: "notes", notesTab: "manual" },
+    { icon: FileText, label: t("dashboard.scratchNotes"), value: stats.scratch_notes, color: "var(--purple)", page: "notes", notesTab: "scratch" },
     { icon: Clipboard, label: t("dashboard.clips"), value: stats.clips, color: "var(--pink)", page: "clipboard" },
     { icon: Lightbulb, label: t("dashboard.plans"), value: stats.plans, color: "var(--yellow)", page: "plans" },
   ];
@@ -238,7 +250,7 @@ export default function DashboardPage({ onNavigate, active = false }: { onNaviga
       {/* Onboarding Checklist */}
       <OnboardingChecklist
         onNavigate={(page) => onNavigate?.(page)}
-        onWriteNote={() => onNavigate?.("notes")}
+        onWriteNote={() => navigateTo("notes", "scratch")}
         hasNotes={(stats.conversations + stats.daily_notes + stats.manuals + stats.scratch_notes) > 0}
         clipboardActive={clipStatus?.watching ?? false}
         editorConfigured={editorConfigured}
@@ -251,7 +263,7 @@ export default function DashboardPage({ onNavigate, active = false }: { onNaviga
           return (
             <div
               key={card.label}
-              onClick={() => card.page && onNavigate?.(card.page)}
+              onClick={() => card.page && navigateTo(card.page, card.notesTab)}
               style={{
                 ...cardStyle,
                 cursor: card.page ? "pointer" : "default",
@@ -359,7 +371,7 @@ export default function DashboardPage({ onNavigate, active = false }: { onNaviga
                   <button
                     key={item.path}
                     type="button"
-                    onClick={() => onNavigate?.(cfg.page)}
+                    onClick={() => openRecord(item)}
                     style={{
                       display: "flex", alignItems: "center", gap: 8,
                       padding: "6px 8px", borderRadius: 6,
@@ -391,10 +403,7 @@ export default function DashboardPage({ onNavigate, active = false }: { onNaviga
       {/* Today's Review */}
       {reviewItem && (
         <div style={{ ...cardStyle, marginBottom: 16, cursor: "pointer" }}
-          onClick={() => {
-            const cfg = categoryConfig[reviewItem.category] || categoryConfig.scratch;
-            onNavigate?.(cfg.page);
-          }}
+          onClick={() => openRecord(reviewItem)}
         >
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10 }}>
             <RefreshCw size={13} style={{ color: "var(--yellow)" }} />

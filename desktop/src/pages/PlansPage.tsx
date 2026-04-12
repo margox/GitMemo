@@ -12,6 +12,7 @@ import { useI18n } from "../hooks/useI18n";
 import { useToast } from "../hooks/useToast";
 import { usePlatform } from "../hooks/usePlatform";
 import { useFileWatcher } from "../hooks/useFileWatcher";
+import { useAppStore } from "../hooks/useAppStore";
 
 interface FileEntry {
   name: string;
@@ -25,6 +26,7 @@ interface FileEntry {
 export default function PlansPage({ onFocusSidebar: _onFocusSidebar, enterTrigger: _enterTrigger }: { onFocusSidebar?: () => void; enterTrigger?: number } = {}) {
   const { t } = useI18n();
   const { showToast } = useToast();
+  const { pendingOpenPath, consumePendingOpenPath } = useAppStore();
   const isMobile = usePlatform() === "mobile";
   useRelativeTimeTick();
   const panel = useResizablePanel("plans", 300);
@@ -53,6 +55,12 @@ export default function PlansPage({ onFocusSidebar: _onFocusSidebar, enterTrigge
       setTimeout(() => itemRefs.current.get(path)?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 50);
     } catch (e) { console.error(e); }
   };
+
+  useEffect(() => {
+    if (!pendingOpenPath?.startsWith("plans/")) return;
+    void openFile(pendingOpenPath);
+    consumePendingOpenPath();
+  }, [pendingOpenPath, consumePendingOpenPath]);
 
   const navPrev = useCallback(() => {
     if (!selectedFile || files.length === 0) return;

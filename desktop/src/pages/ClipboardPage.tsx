@@ -83,7 +83,7 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
   const isMobile = usePlatform() === "mobile";
   useRelativeTimeTick();
   const panel = useResizablePanel("clipboard", 340);
-  const { clipboardStatus: status, refreshClipboardStatus } = useAppStore();
+  const { clipboardStatus: status, refreshClipboardStatus, pendingOpenPath, consumePendingOpenPath } = useAppStore();
   const [savedClips, setSavedClips] = useState<FileEntry[]>([]);
   const [clipsLoading, setClipsLoading] = useState(true);
   const [refreshTrigger, setRefreshTrigger] = useState(0);
@@ -162,6 +162,12 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
       setTimeout(() => itemRefs.current.get(path)?.scrollIntoView({ block: "nearest", behavior: "smooth" }), 50);
     } catch (e) { console.error(e); }
   };
+
+  useEffect(() => {
+    if (!pendingOpenPath?.startsWith("clips/")) return;
+    void openFile(pendingOpenPath);
+    consumePendingOpenPath();
+  }, [pendingOpenPath, consumePendingOpenPath]);
 
   const navPrev = useCallback(() => {
     if (!selectedFile || savedClips.length === 0) return;
@@ -288,7 +294,16 @@ export default function ClipboardPage({ onFocusSidebar: _onFocusSidebar, enterTr
         {/* Clip list */}
         <div style={{ flex: 1, overflowY: "auto" }}>
           {clipsLoading ? (
-            <Loading compact text={t("clipboard.loading")} />
+            <div
+              style={{
+                minHeight: "100%",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+              }}
+            >
+              <Loading compact text={t("clipboard.loading")} />
+            </div>
           ) : savedClips.length === 0 ? (
             <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", padding: "48px 20px", textAlign: "center" }}>
               <Clipboard size={36} style={{ color: "var(--border)", marginBottom: 12 }} />

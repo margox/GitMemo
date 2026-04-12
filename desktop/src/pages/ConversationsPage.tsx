@@ -12,6 +12,7 @@ import { useFileWatcher } from "../hooks/useFileWatcher";
 import { formatDateOnly, relativeTime } from "../utils/time";
 import { useI18n } from "../hooks/useI18n";
 import { useToast } from "../hooks/useToast";
+import { useAppStore } from "../hooks/useAppStore";
 
 interface FileEntry {
   name: string;
@@ -101,6 +102,7 @@ function parseConversationBody(body: string): ParsedConversationBody {
 export default function ConversationsPage({ onFocusSidebar, enterTrigger, sidebarFocused }: { onFocusSidebar?: () => void; enterTrigger?: number; sidebarFocused?: boolean }) {
   const { t } = useI18n();
   const { showToast } = useToast();
+  const { pendingOpenPath, consumePendingOpenPath } = useAppStore();
   useRelativeTimeTick();
   const isMobile = usePlatform() === "mobile";
   const panel = useResizablePanel("conversations", 300);
@@ -169,6 +171,12 @@ export default function ConversationsPage({ onFocusSidebar, enterTrigger, sideba
       console.error(e);
     }
   }, [applyConversationRaw]);
+
+  useEffect(() => {
+    if (!pendingOpenPath?.startsWith("conversations/")) return;
+    void openFile(pendingOpenPath);
+    consumePendingOpenPath();
+  }, [pendingOpenPath, openFile, consumePendingOpenPath]);
 
   const startEdit = useCallback(() => {
     if (!selectedFile) return;

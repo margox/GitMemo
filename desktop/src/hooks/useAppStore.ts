@@ -46,6 +46,7 @@ async function logUpdaterError(message: string): Promise<void> {
 // ---- Shared types (single source of truth) ----
 
 export type Theme = "dark" | "light";
+export type NotesTab = "scratch" | "daily" | "manual";
 
 export interface ClipboardStatus {
   watching: boolean;
@@ -85,6 +86,15 @@ interface AppStore {
   theme: Theme;
   toggleTheme: () => void;
 
+  // Cross-page notes tab selection
+  notesTab: NotesTab;
+  setNotesTab: (tab: NotesTab) => void;
+
+  // Cross-page record opening
+  pendingOpenPath: string | null;
+  setPendingOpenPath: (path: string | null) => void;
+  consumePendingOpenPath: () => void;
+
   // App meta (version, release)
   appMeta: AppMeta | null;
 
@@ -113,6 +123,8 @@ const useAppStoreInternal = create<AppStore>((set, get) => ({
   claudeEnabled: false,
   cursorEnabled: false,
   theme: loadTheme(),
+  notesTab: "scratch",
+  pendingOpenPath: null,
   appMeta: null,
   updateStatus: "idle",
   updateVersion: null,
@@ -147,6 +159,18 @@ const useAppStoreInternal = create<AppStore>((set, get) => ({
     const next = get().theme === "dark" ? "light" : "dark";
     localStorage.setItem("gitmemo-theme", next);
     set({ theme: next });
+  },
+
+  setNotesTab: (tab) => {
+    set({ notesTab: tab });
+  },
+
+  setPendingOpenPath: (path) => {
+    set({ pendingOpenPath: path });
+  },
+
+  consumePendingOpenPath: () => {
+    set({ pendingOpenPath: null });
   },
 
   checkForUpdates: async () => {
