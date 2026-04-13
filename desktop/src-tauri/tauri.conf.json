@@ -77,7 +77,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXkgRDFCRTI3QjM2RTUyNDcxMQpSV1FSUjFKdXN5ZSswWWhnblg1WHBJQ1NPT1RyVTlCT0FaY0ljdGJlK0t6Q2JmamozYlFVYkp2MQo=",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEY2NkFGOTlFMTRDN0FBNDgKUldSSXFzY1VudmxxOW1od1I5ZXNNcm53OHdNNXJqelROMFVtQW1uVTlzWjBlZld2YlRpNzA1VFkK",
       "endpoints": [
         "https://github.com/sahadev/gitmemo/releases/latest/download/latest.json"
       ]
