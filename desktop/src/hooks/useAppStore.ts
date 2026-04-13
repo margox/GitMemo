@@ -99,7 +99,7 @@ interface AppStore {
   appMeta: AppMeta | null;
 
   // Update
-  updateStatus: "idle" | "checking" | "available" | "downloading" | "error";
+  updateStatus: "idle" | "checking" | "available" | "downloading" | "error" | "upToDate";
   updateVersion: string | null;
   updateProgress: number;
   updateError: string | null;
@@ -187,7 +187,7 @@ const useAppStoreInternal = create<AppStore>((set, get) => ({
         set({ updateStatus: "available", updateVersion: update.version });
       } else {
         await logUpdaterInfo(`check ok in ${ms}ms: already latest`);
-        set({ updateStatus: "idle", updateVersion: null });
+        set({ updateStatus: "upToDate", updateVersion: null });
       }
     } catch (e) {
       const ms = Math.round(performance.now() - t0);

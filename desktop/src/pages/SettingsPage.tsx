@@ -657,7 +657,9 @@ export default function SettingsPage({ onNavigate }: { onNavigate?: (page: Page)
           )}
           {updateStatus === "error" && (
             <>
-              <span style={{ fontSize: 11, color: "var(--red)" }}>{t("settings.updateError")}</span>
+              <span style={{ fontSize: 11, color: "var(--red)", maxWidth: 260, wordBreak: "break-word" }}>
+                {updateError || t("settings.updateError")}
+              </span>
               <button
                 onClick={() => void checkForUpdates()}
                 style={{
@@ -668,6 +670,9 @@ export default function SettingsPage({ onNavigate }: { onNavigate?: (page: Page)
                 {t("settings.checkUpdate")}
               </button>
             </>
+          )}
+          {updateStatus === "upToDate" && (
+            <span style={{ fontSize: 11, color: "var(--green)" }}>{t("settings.upToDate")}</span>
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 12, marginTop: 12 }}>
