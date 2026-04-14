@@ -186,7 +186,7 @@
     "proxy": "网络代理",
     "proxyDesc": "为更新和网络请求配置代理",
     "proxySystem": "系统代理",
-    "proxyDirect": "直连",
+    "proxyNone": "直连",
     "proxyCustom": "自定义",
     "proxyUrl": "代理地址",
     "proxyUrlPlaceholder": "http://proxy:8080 或 socks5://proxy:1080",

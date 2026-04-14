@@ -186,7 +186,7 @@
     "proxy": "Network proxy",
     "proxyDesc": "Proxy for updates and network requests",
     "proxySystem": "System",
-    "proxyDirect": "Direct",
+    "proxyNone": "Direct",
     "proxyCustom": "Custom",
     "proxyUrl": "Proxy URL",
     "proxyUrlPlaceholder": "http://proxy:8080 or socks5://proxy:1080",

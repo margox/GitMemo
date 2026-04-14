@@ -104,7 +104,7 @@ export default function SettingsPage({ onNavigate }: { onNavigate?: (page: Page)
     try {
       await invoke<string>("set_proxy", { mode, url });
       refreshSettings();
-      if (mode === "custom") setEditingProxy(true);
+      setEditingProxy(mode === "custom");
     } catch (e) {
       showToast(`Error: ${e}`, true);
     }
