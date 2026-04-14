@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { openUrl } from "@tauri-apps/plugin-opener";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
-import { Settings, Power, Clipboard, Sun, Moon, GitBranch, ExternalLink, Globe, FolderOpen, Globe2, Terminal, Code, Copy, Check, MessageCircle, ScrollText, X, Download, RefreshCw } from "lucide-react";
+import { Settings, Power, Clipboard, Sun, Moon, GitBranch, ExternalLink, Globe, FolderOpen, Globe2, Terminal, Code, Copy, Check, MessageCircle, ScrollText, X, Download, RefreshCw, Wifi } from "lucide-react";
 import { useSync } from "../hooks/useSync";
 import { useI18n, type Locale } from "../hooks/useI18n";
 import { useToast } from "../hooks/useToast";
@@ -64,6 +64,8 @@ export default function SettingsPage({ onNavigate }: { onNavigate?: (page: Page)
   const [savingRemote, setSavingRemote] = useState(false);
   const [showChangelog, setShowChangelog] = useState(false);
   const [changelog, setChangelog] = useState<{ version: string; date: string; changes: string[] }[]>([]);
+  const [proxyUrlInput, setProxyUrlInput] = useState("");
+  const [editingProxy, setEditingProxy] = useState(false);
 
   useEffect(() => {
     invoke<string>("get_branch").then((b) => { setBranch(b); setBranchInput(b); }).catch(console.error);
@@ -95,6 +97,29 @@ export default function SettingsPage({ onNavigate }: { onNavigate?: (page: Page)
       await invoke<string>("set_clipboard_autostart", { enabled: !settings.clipboard_autostart });
       refreshSettings();
     } catch (e) { console.error(e); }
+  };
+
+  const setProxyMode = async (mode: "system" | "none" | "custom") => {
+    const url = mode === "custom" ? (proxyUrlInput || settings?.proxy_url || "") : "";
+    try {
+      await invoke<string>("set_proxy", { mode, url });
+      refreshSettings();
+      if (mode === "custom") setEditingProxy(true);
+    } catch (e) {
+      showToast(`Error: ${e}`, true);
+    }
+  };
+
+  const saveProxyUrl = async () => {
+    const trimmed = proxyUrlInput.trim();
+    try {
+      await invoke<string>("set_proxy", { mode: "custom", url: trimmed });
+      refreshSettings();
+      setEditingProxy(false);
+      showToast(t("conversations.saved"));
+    } catch (e) {
+      showToast(`${e}`, true);
+    }
   };
 
   const toggleClaudeIntegration = async () => {
@@ -297,6 +322,65 @@ export default function SettingsPage({ onNavigate }: { onNavigate?: (page: Page)
               </div>
             </div>
             <Toggle enabled={settings?.clipboard_autostart ?? false} onToggle={toggleClipboardAutostart} />
+          </div>
+
+          <div style={{ borderTop: "1px solid var(--border)" }} />
+
+          {/* Network proxy */}
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={rowStyle}>
+              <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <Wifi size={15} style={{ color: "var(--text-secondary)" }} />
+                <div>
+                  <p style={{ fontSize: 13, fontWeight: 500 }}>{t("settings.proxy")}</p>
+                  <p style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>{t("settings.proxyDesc")}</p>
+                </div>
+              </div>
+              <div style={{ display: "flex", gap: 4 }}>
+                {(["system", "none", "custom"] as const).map((mode) => (
+                  <button
+                    key={mode}
+                    onClick={() => void setProxyMode(mode)}
+                    style={{
+                      padding: "4px 12px", borderRadius: 4, fontSize: 12, cursor: "pointer",
+                      background: (settings?.proxy_mode ?? "system") === mode ? "var(--accent)" : "var(--bg-hover)",
+                      color: (settings?.proxy_mode ?? "system") === mode ? "#fff" : "var(--text-secondary)",
+                      border: (settings?.proxy_mode ?? "system") === mode ? "1px solid var(--accent)" : "1px solid var(--border)",
+                    }}
+                  >
+                    {t(`settings.proxy${mode.charAt(0).toUpperCase() + mode.slice(1)}` as "settings.proxySystem" | "settings.proxyDirect" | "settings.proxyCustom")}
+                  </button>
+                ))}
+              </div>
+            </div>
+            {(settings?.proxy_mode === "custom" || editingProxy) && (
+              <div style={{ display: "flex", alignItems: "center", gap: 6, paddingLeft: 25 }}>
+                <input
+                  autoFocus
+                  value={proxyUrlInput || settings?.proxy_url || ""}
+                  onChange={(e) => setProxyUrlInput(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && !e.nativeEvent.isComposing) void saveProxyUrl();
+                    if (e.key === "Escape") { setEditingProxy(false); setProxyUrlInput(settings?.proxy_url ?? ""); }
+                  }}
+                  placeholder={t("settings.proxyUrlPlaceholder")}
+                  style={{
+                    flex: 1, maxWidth: 320, padding: "4px 8px", borderRadius: 4, fontSize: 11,
+                    background: "var(--bg)", border: "1px solid var(--accent)", color: "var(--text)",
+                    fontFamily: "ui-monospace, monospace",
+                  }}
+                />
+                <button
+                  onClick={() => void saveProxyUrl()}
+                  style={{
+                    padding: "4px 10px", borderRadius: 4, fontSize: 11, cursor: "pointer",
+                    background: "var(--accent)", border: "none", color: "#fff", fontWeight: 600,
+                  }}
+                >
+                  {t("conversations.save")}
+                </button>
+              </div>
+            )}
           </div>
 
           <div style={{ borderTop: "1px solid var(--border)" }} />

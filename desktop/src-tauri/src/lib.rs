@@ -84,6 +84,7 @@ pub fn run() {
             settings::get_settings,
             settings::set_autostart,
             settings::set_clipboard_autostart,
+            settings::set_proxy,
             settings::get_branch,
             settings::set_branch,
             settings::set_remote,
@@ -116,6 +117,9 @@ pub fn run() {
 
             // Start file system watcher
             watcher::start_file_watcher(app.handle().clone());
+
+            // Apply proxy environment variables before any network operations
+            settings::apply_proxy_env();
 
             // Pull latest from remote on startup (with health check), then auto-capture
             std::thread::spawn(|| {

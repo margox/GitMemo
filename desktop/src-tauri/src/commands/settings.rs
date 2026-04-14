@@ -5,11 +5,24 @@ use tauri_plugin_autostart::ManagerExt;
 
 const SETTINGS_FILE: &str = "desktop_settings.toml";
 
+#[derive(Debug, Clone, Serialize, Deserialize, Default, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ProxyMode {
+    #[default]
+    System,
+    None,
+    Custom,
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct DesktopSettings {
     pub autostart: bool,
     #[serde(default = "default_true")]
     pub clipboard_autostart: bool,
+    #[serde(default)]
+    pub proxy_mode: ProxyMode,
+    #[serde(default)]
+    pub proxy_url: String,
 }
 
 fn default_true() -> bool { true }
@@ -19,6 +32,8 @@ impl Default for DesktopSettings {
         Self {
             autostart: false,
             clipboard_autostart: true,
+            proxy_mode: ProxyMode::default(),
+            proxy_url: String::new(),
         }
     }
 }
@@ -125,6 +140,49 @@ pub fn set_clipboard_autostart(enabled: bool) -> Result<String, String> {
     } else {
         "Clipboard auto-start disabled".into()
     })
+}
+
+#[tauri::command]
+pub fn set_proxy(mode: String, url: String) -> Result<String, String> {
+    let proxy_mode = match mode.as_str() {
+        "none" => ProxyMode::None,
+        "custom" => ProxyMode::Custom,
+        _ => ProxyMode::System,
+    };
+
+    if proxy_mode == ProxyMode::Custom && !url.is_empty() {
+        url::Url::parse(&url).map_err(|e| format!("Invalid proxy URL: {e}"))?;
+    }
+
+    let mut settings = load_settings();
+    settings.proxy_mode = proxy_mode;
+    settings.proxy_url = url;
+    save_settings(&settings)?;
+
+    apply_proxy_env();
+    Ok("ok".into())
+}
+
+pub fn apply_proxy_env() {
+    let settings = load_settings();
+    match settings.proxy_mode {
+        ProxyMode::None => {
+            std::env::remove_var("HTTP_PROXY");
+            std::env::remove_var("HTTPS_PROXY");
+            std::env::set_var("NO_PROXY", "*");
+        }
+        ProxyMode::Custom if !settings.proxy_url.is_empty() => {
+            std::env::set_var("HTTP_PROXY", &settings.proxy_url);
+            std::env::set_var("HTTPS_PROXY", &settings.proxy_url);
+            std::env::remove_var("NO_PROXY");
+        }
+        _ => {
+            // System: clear any overrides
+            std::env::remove_var("HTTP_PROXY");
+            std::env::remove_var("HTTPS_PROXY");
+            std::env::remove_var("NO_PROXY");
+        }
+    }
 }
 
 #[tauri::command]

@@ -182,7 +182,15 @@
     "installUpdate": "Install Update",
     "downloading": "Downloading...",
     "updateError": "Update check failed",
-    "upToDate": "Up to date"
+    "upToDate": "Up to date",
+    "proxy": "Network proxy",
+    "proxyDesc": "Proxy for updates and network requests",
+    "proxySystem": "System",
+    "proxyDirect": "Direct",
+    "proxyCustom": "Custom",
+    "proxyUrl": "Proxy URL",
+    "proxyUrlPlaceholder": "http://proxy:8080 or socks5://proxy:1080",
+    "proxyInvalidUrl": "Invalid proxy URL"
   },
   "time": {
     "justNow": "Just now",

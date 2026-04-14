@@ -57,6 +57,8 @@ export interface ClipboardStatus {
 export interface DesktopSettings {
   autostart: boolean;
   clipboard_autostart: boolean;
+  proxy_mode: "system" | "none" | "custom";
+  proxy_url: string;
 }
 
 export interface AppMeta {
@@ -180,7 +182,10 @@ const useAppStoreInternal = create<AppStore>((set, get) => ({
       `check start (timeout_ms=${UPDATE_CHECK_TIMEOUT_MS}, endpoint=tauri.conf updater endpoints)`,
     );
     try {
-      const update = await check({ timeout: UPDATE_CHECK_TIMEOUT_MS });
+      const { settings } = get();
+      const proxyOpt = settings?.proxy_mode === "custom" && settings.proxy_url
+        ? { proxy: settings.proxy_url } : {};
+      const update = await check({ timeout: UPDATE_CHECK_TIMEOUT_MS, ...proxyOpt });
       const ms = Math.round(performance.now() - t0);
       if (update) {
         await logUpdaterInfo(`check ok in ${ms}ms: available version=${update.version}`);
@@ -202,7 +207,10 @@ const useAppStoreInternal = create<AppStore>((set, get) => ({
     const t0 = performance.now();
     await logUpdaterInfo(`install: re-check start (timeout_ms=${UPDATE_CHECK_TIMEOUT_MS})`);
     try {
-      const update = await check({ timeout: UPDATE_CHECK_TIMEOUT_MS });
+      const { settings } = get();
+      const proxyOpt = settings?.proxy_mode === "custom" && settings.proxy_url
+        ? { proxy: settings.proxy_url } : {};
+      const update = await check({ timeout: UPDATE_CHECK_TIMEOUT_MS, ...proxyOpt });
       if (!update?.available) {
         await logUpdaterWarn(`install: re-check found no update after ${Math.round(performance.now() - t0)}ms, abort`);
         set({ updateStatus: "idle" });
