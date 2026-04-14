@@ -177,12 +177,52 @@ pub fn apply_proxy_env() {
             std::env::remove_var("NO_PROXY");
         }
         _ => {
-            // System: clear any overrides
-            std::env::remove_var("HTTP_PROXY");
-            std::env::remove_var("HTTPS_PROXY");
+            // System: detect macOS system proxy and set env vars
             std::env::remove_var("NO_PROXY");
+            if let Some(proxy) = detect_macos_system_proxy() {
+                std::env::set_var("HTTP_PROXY", &proxy);
+                std::env::set_var("HTTPS_PROXY", &proxy);
+            } else {
+                std::env::remove_var("HTTP_PROXY");
+                std::env::remove_var("HTTPS_PROXY");
+            }
         }
     }
+}
+
+/// Detect macOS system proxy by parsing `scutil --proxy` output.
+fn detect_macos_system_proxy() -> Option<String> {
+    let output = std::process::Command::new("scutil")
+        .arg("--proxy")
+        .output()
+        .ok()?;
+    let text = String::from_utf8_lossy(&output.stdout);
+
+    // Try HTTPS proxy first, fall back to HTTP
+    if let Some(url) = parse_scutil_proxy(&text, "HTTPS") {
+        return Some(url);
+    }
+    parse_scutil_proxy(&text, "HTTP")
+}
+
+/// Parse a specific proxy type (HTTP or HTTPS) from scutil output.
+/// Looks for `{prefix}Enable : 1`, `{prefix}Proxy : host`, `{prefix}Port : port`.
+fn parse_scutil_proxy(text: &str, prefix: &str) -> Option<String> {
+    let enabled_key = format!("{}Enable : 1", prefix);
+    if !text.contains(&enabled_key) {
+        return None;
+    }
+    let proxy_key = format!("{}Proxy : ", prefix);
+    let port_key = format!("{}Port : ", prefix);
+    let host = text.lines()
+        .find(|l| l.contains(&proxy_key))
+        .and_then(|l| l.split(" : ").nth(1))
+        .map(|s| s.trim())?;
+    let port = text.lines()
+        .find(|l| l.contains(&port_key))
+        .and_then(|l| l.split(" : ").nth(1))
+        .map(|s| s.trim())?;
+    Some(format!("http://{}:{}", host, port))
 }
 
 #[tauri::command]
