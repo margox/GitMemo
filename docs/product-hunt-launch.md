@@ -145,7 +145,7 @@ Desktop 当前提供 macOS 版本，剪贴板捕获是可选功能；CLI 支持 
 ```
 🚀 Just launched GitMemo on Product Hunt!
 
-A local-first tool for saving Claude Code and Cursor conversations, notes, and selected AI work into Git.
+A local-first tool for saving Claude Code and Cursor AI conversations, notes, and everyday work into Git.
 
 Search it later from CLI, Desktop, or MCP.
 Remote sync optional.
@@ -172,7 +172,7 @@ GitHub: https://github.com/sahadev/GitMemo
 
 ### Reddit r/ClaudeAI
 
-**标题**: I built a tool that auto-syncs all your Claude conversations to Git
+**标题**: I built a tool that auto-syncs AI conversations to Git
 
 **正文**:
 Same as HN but more casual, emphasize the "I kept losing conversations" pain point.

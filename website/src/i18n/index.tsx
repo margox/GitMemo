@@ -62,7 +62,7 @@ const en: Record<string, string> = {
 
   // Features
   'feat.label': 'Features',
-  'feat.title': 'Capture, search, and keep AI work in Git',
+  'feat.title': 'Capture, search, and keep useful work in Git',
   'feat.subtitle': 'GitMemo helps supported Claude Code and Cursor workflows save conversations, notes, and everyday work into your own repo.',
   'feat.conversations.title': 'Save AI Conversations',
   'feat.conversations.desc': 'Claude Code and Cursor sessions can be saved as Markdown through GitMemo’s configured rules and save skills.',
@@ -181,7 +181,7 @@ const zh: Record<string, string> = {
 
   // Features
   'feat.label': '核心特性',
-  'feat.title': '把 AI 工作成果留住、可搜索、可归档到 Git',
+  'feat.title': '把有价值的工作内容留住、可搜索、可归档到 Git',
   'feat.subtitle': 'GitMemo 帮助已支持的 Claude Code 和 Cursor 工作流，把对话、笔记和日常工作产物保存到你自己的仓库里。',
   'feat.conversations.title': '保存 AI 对话',
   'feat.conversations.desc': 'Claude Code 和 Cursor 会话可通过 GitMemo 配置的规则与保存技能写入 Markdown。',
