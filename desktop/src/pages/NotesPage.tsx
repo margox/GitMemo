@@ -374,7 +374,7 @@ export default function NotesPage({ focusTrigger, onFocusSidebar: _onFocusSideba
                 {activeTab === "scratch" || activeTab === "daily"
                   ? t("notes.useInputAbove")
                   : activeTab === "manual"
-                  ? t("notes.createViaCli")
+                  ? t("notes.docsHint")
                   : "Saved automatically from AI chats"}
               </p>
             </div>
