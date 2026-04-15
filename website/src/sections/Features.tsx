@@ -1,4 +1,4 @@
-import { MessageSquare, Clipboard, Search, Plug, Zap } from 'lucide-react'
+import { MessageSquare, Clipboard, Search, Plug, Zap, FileText } from 'lucide-react'
 import FeatureCard from '../components/FeatureCard'
 import FadeIn from '../components/FadeIn'
 import { useI18n } from '../i18n'
@@ -8,6 +8,7 @@ export default function Features() {
 
   const features = [
     { icon: <MessageSquare size={20} />, titleKey: 'feat.conversations.title', descKey: 'feat.conversations.desc' },
+    { icon: <FileText size={20} />, titleKey: 'feat.notes.title', descKey: 'feat.notes.desc' },
     { icon: <Clipboard size={20} />, titleKey: 'feat.clipboard.title', descKey: 'feat.clipboard.desc' },
     { icon: <Search size={20} />, titleKey: 'feat.search.title', descKey: 'feat.search.desc' },
     { icon: <Plug size={20} />, titleKey: 'feat.mcp.title', descKey: 'feat.mcp.desc' },

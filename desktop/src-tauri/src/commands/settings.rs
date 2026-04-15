@@ -1,4 +1,5 @@
 use gitmemo_core::storage::{files, git};
+use gitmemo_core::utils::config::Config;
 use serde::{Deserialize, Serialize};
 #[cfg(desktop)]
 use tauri_plugin_autostart::ManagerExt;
@@ -317,8 +318,23 @@ pub fn set_remote(url: String) -> Result<String, String> {
 
 // ── Helper ──────────────────────────────────────────────────────────────────
 
+fn update_config_lang(lang: &str) -> Result<(), String> {
+    let config_path = Config::config_path();
+    if !config_path.exists() {
+        return Ok(());
+    }
+
+    let mut config = Config::load(&config_path).map_err(|e| e.to_string())?;
+    if config.lang == lang {
+        return Ok(());
+    }
+
+    config.lang = lang.to_string();
+    config.save(&config_path).map_err(|e| e.to_string())
+}
+
 fn detect_lang() -> gitmemo_core::utils::i18n::Lang {
-    use gitmemo_core::utils::{config::Config, i18n::Lang};
+    use gitmemo_core::utils::i18n::Lang;
     let config_path = Config::config_path();
     if config_path.exists() {
         if let Ok(config) = Config::load(&config_path) {
@@ -326,6 +342,15 @@ fn detect_lang() -> gitmemo_core::utils::i18n::Lang {
         }
     }
     Lang::En
+}
+
+#[tauri::command]
+pub fn set_language(lang: String) -> Result<String, String> {
+    match lang.as_str() {
+        "en" | "zh" => update_config_lang(&lang)?,
+        _ => return Err("Unsupported language".into()),
+    }
+    Ok(lang)
 }
 
 fn claude_md_path() -> std::path::PathBuf {
@@ -359,16 +384,17 @@ fn install_save_skill(skills_dir: &std::path::Path) -> Result<(), String> {
     Ok(())
 }
 
-fn install_claude_skills() -> Result<(), String> {
+fn install_claude_skills(lang: String) -> Result<(), String> {
     use gitmemo_core::inject::session_log_skill;
+    use gitmemo_core::utils::i18n::Lang;
 
     let sync_dir = files::sync_dir().to_string_lossy().to_string();
-    let lang = detect_lang();
+    let lang_enum = Lang::parse(&lang);
     let skills = claude_skills_dir();
     install_save_skill(&skills)?;
 
     let session_log_dir = skills.join("gitmemo-session-log");
-    session_log_skill::install(&session_log_dir, &sync_dir, lang).map_err(|e| e.to_string())?;
+    session_log_skill::install(&session_log_dir, &sync_dir, lang_enum).map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -399,21 +425,25 @@ pub fn get_claude_integration_status() -> Result<bool, String> {
 }
 
 #[tauri::command]
-pub fn setup_claude_integration() -> Result<String, String> {
+pub fn setup_claude_integration(lang: String) -> Result<String, String> {
     use gitmemo_core::inject::claude_md;
+    use gitmemo_core::utils::i18n::Lang;
+
+    update_config_lang(&lang)?;
 
     let path = claude_md_path();
     let sync_dir = files::sync_dir().to_string_lossy().to_string();
-    let lang = detect_lang();
+    let lang_enum = Lang::parse(&lang);
 
-    claude_md::inject(&path, &sync_dir, lang).map_err(|e| e.to_string())?;
-    install_claude_skills()?;
+    claude_md::inject(&path, &sync_dir, lang_enum).map_err(|e| e.to_string())?;
+    install_claude_skills(lang)?;
     Ok("enabled".into())
 }
 
 #[tauri::command]
-pub fn update_claude_skills() -> Result<String, String> {
-    install_claude_skills()?;
+pub fn update_claude_skills(lang: String) -> Result<String, String> {
+    update_config_lang(&lang)?;
+    install_claude_skills(lang)?;
     Ok("updated".into())
 }
 
@@ -448,6 +478,8 @@ pub fn setup_cursor_integration(lang: String) -> Result<String, String> {
     use gitmemo_core::inject::cursor_rules;
     use gitmemo_core::utils::i18n::Lang;
 
+    update_config_lang(&lang)?;
+
     let sync_dir = files::sync_dir().to_string_lossy().to_string();
     let lang_enum = Lang::parse(&lang);
 
@@ -463,6 +495,7 @@ pub fn setup_cursor_integration(lang: String) -> Result<String, String> {
 
 #[tauri::command]
 pub fn update_cursor_skills(lang: String) -> Result<String, String> {
+    update_config_lang(&lang)?;
     install_cursor_skills(lang)?;
     Ok("updated".into())
 }

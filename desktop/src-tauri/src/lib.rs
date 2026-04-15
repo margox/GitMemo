@@ -98,6 +98,7 @@ pub fn run() {
             settings::set_autostart,
             settings::set_clipboard_autostart,
             settings::set_proxy,
+            settings::set_language,
             settings::get_branch,
             settings::set_branch,
             settings::set_remote,

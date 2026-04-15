@@ -124,13 +124,22 @@ export default function SettingsPage({ onNavigate }: { onNavigate?: (page: Page)
     }
   };
 
+  const changeLanguage = async (nextLocale: Locale) => {
+    setLocale(nextLocale);
+    try {
+      await invoke<string>("set_language", { lang: nextLocale });
+    } catch (e) {
+      showToast(`Error: ${e}`, true);
+    }
+  };
+
   const toggleClaudeIntegration = async () => {
     try {
       if (claudeEnabled) {
         await invoke<string>("remove_claude_integration");
         showToast("Claude integration disabled");
       } else {
-        await invoke<string>("setup_claude_integration");
+        await invoke<string>("setup_claude_integration", { lang: locale });
         showToast("Claude integration enabled");
       }
       refreshIntegrationStatus();
@@ -157,7 +166,7 @@ export default function SettingsPage({ onNavigate }: { onNavigate?: (page: Page)
   const updateClaudeSkills = async () => {
     setUpdatingClaudeSkills(true);
     try {
-      await invoke<string>("update_claude_skills");
+      await invoke<string>("update_claude_skills", { lang: locale });
       showToast("Claude skills updated");
     } catch (e) {
       showToast(`Error: ${e}`, true);
@@ -308,7 +317,7 @@ export default function SettingsPage({ onNavigate }: { onNavigate?: (page: Page)
               {languages.map((lang) => (
                 <button
                   key={lang.id}
-                  onClick={() => setLocale(lang.id)}
+                  onClick={() => void changeLanguage(lang.id)}
                   style={{
                     padding: "4px 12px", borderRadius: 4, fontSize: 12, cursor: "pointer",
                     background: locale === lang.id ? "var(--accent)" : "var(--bg-hover)",
